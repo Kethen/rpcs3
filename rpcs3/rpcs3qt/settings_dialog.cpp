@@ -2483,6 +2483,9 @@ settings_dialog::settings_dialog(std::shared_ptr<gui_settings> gui_settings, std
 	m_emu_settings->EnhanceCheckBox(ui->debugOverlayIO, emu_settings_type::IoDebugOverlay);
 	SubscribeTooltip(ui->debugOverlayIO, tooltips.settings.debug_overlay_io);
 
+	m_emu_settings->EnhanceCheckBox(ui->captureUSBPassthrough, emu_settings_type::IoCaptureUSBPassthrough);
+	SubscribeTooltip(ui->captureUSBPassthrough, tooltips.settings.capture_usb_passthrough);
+
 	// Comboboxes
 
 	m_emu_settings->EnhanceComboBox(ui->combo_accurate_ppu_128, emu_settings_type::AccuratePPU128Loop, true);

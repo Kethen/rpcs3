@@ -167,6 +167,7 @@ enum class emu_settings_type
 	MidiDevices,
 	SDLMappings,
 	IoDebugOverlay,
+	IoCaptureUSBPassthrough,
 
 	// Misc
 	ExitRPCS3OnFinish,
@@ -367,6 +368,7 @@ inline static const std::map<emu_settings_type, cfg_location> settings_location 
 	{ emu_settings_type::MidiDevices,     { "Input/Output", "Emulated Midi devices" }},
 	{ emu_settings_type::SDLMappings,     { "Input/Output", "Load SDL GameController Mappings" }},
 	{ emu_settings_type::IoDebugOverlay,  { "Input/Output", "IO Debug overlay" }},
+	{ emu_settings_type::IoCaptureUSBPassthrough,  { "Input/Output", "Capture USB Passthrough" }},
 
 	// Misc
 	{ emu_settings_type::ExitRPCS3OnFinish,               { "Miscellaneous", "Exit RPCS3 when process finishes" }},
