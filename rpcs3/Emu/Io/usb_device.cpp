@@ -151,6 +151,7 @@ usb_device_passthrough::usb_device_passthrough(libusb_device* _device, libusb_de
 				fclose(capture_file);
 				capture_file = nullptr;
 			}
+			fflush(capture_file);
 		}
 		capture_begin = std::chrono::high_resolution_clock::now();
 	}
@@ -283,7 +284,7 @@ void usb_device_passthrough::read_descriptors()
 				fclose(capture_file);
 				capture_file = nullptr;
 			}
-
+			fflush(capture_file);
 		}
 		capture_file_mutex.unlock();
 
@@ -431,6 +432,7 @@ void usb_device_passthrough::capture_transfer(const struct libusb_transfer* tran
 			fclose(capture_file);
 			capture_file = nullptr;
 		}
+		fflush(capture_file);
 	}
 
 	capture_file_mutex.unlock();
@@ -483,6 +485,7 @@ void usb_device_passthrough::control_transfer(u8 bmRequestType, u8 bRequest, u16
 				fclose(capture_file);
 				capture_file = nullptr;
 			}
+			fflush(capture_file);
 		}
 
 		if (capture_file)
@@ -553,6 +556,7 @@ void usb_device_passthrough::interrupt_transfer(u32 buf_size, u8* buf, u32 endpo
 				fclose(capture_file);
 				capture_file = nullptr;
 			}
+			fflush(capture_file);
 		}
 
 		if (capture_file)
