@@ -222,6 +222,71 @@ void usb_device_passthrough::read_descriptors()
 			continue;
 		}
 
+		capture_file_mutex.lock();
+		if (capture_file && ssize <= 1000)
+		{
+			// capture the request
+			unsigned char capture_buffer[(sizeof(pcap_record_header) + sizeof(linktype_usbpcap_control_header)) * 2 + 8 + 1000] = {0};
+			auto now = std::chrono::high_resolution_clock::now() - capture_begin;
+			auto nanosec = std::chrono::duration_cast<std::chrono::nanoseconds>(now).count();
+			auto sec = std::chrono::duration_cast<std::chrono::seconds>(now).count();
+
+			auto pcap_header = reinterpret_cast<pcap_record_header *>(capture_buffer);
+			auto control_header = reinterpret_cast<linktype_usbpcap_control_header *>(&capture_buffer[sizeof(pcap_record_header)]);
+			unsigned char *data_buf = &capture_buffer[sizeof(pcap_record_header) + sizeof(linktype_usbpcap_control_header)];
+
+			pcap_header->time_sec = sec;
+			pcap_header->time_sub_sec = nanosec % (1 << 9);
+			pcap_header->captured_packet_length = sizeof(linktype_usbpcap_control_header) + 8;
+			pcap_header->original_packet_length = pcap_header->captured_packet_length;
+
+			control_header->h.header_len = sizeof(linktype_usbpcap_control_header);
+			control_header->h.irp_id = index + 1;
+			control_header->h.function = 0xb;
+			control_header->h.transfer = 2;
+			control_header->h.data_len = 8;
+
+			libusb_fill_control_setup(data_buf, +LIBUSB_ENDPOINT_IN | +LIBUSB_REQUEST_TYPE_STANDARD | +LIBUSB_RECIPIENT_DEVICE, LIBUSB_REQUEST_GET_DESCRIPTOR, 0x0200 | index, 0, 1000);
+
+			// capture the response
+			int offset = sizeof(pcap_record_header) + sizeof(linktype_usbpcap_control_header) + 8;
+
+			pcap_header = reinterpret_cast<pcap_record_header *>(&capture_buffer[offset]);
+			control_header = reinterpret_cast<linktype_usbpcap_control_header *>(&capture_buffer[offset + sizeof(pcap_record_header)]);
+			data_buf = &capture_buffer[offset + sizeof(pcap_record_header) + sizeof(linktype_usbpcap_control_header)];
+
+			pcap_header->time_sec = sec;
+			pcap_header->time_sub_sec = nanosec % (1 << 9);
+			pcap_header->captured_packet_length = sizeof(linktype_usbpcap_control_header) + ssize;
+			pcap_header->original_packet_length = pcap_header->captured_packet_length;
+
+			control_header->h.header_len = sizeof(linktype_usbpcap_control_header);
+			control_header->h.irp_id = index + 1;
+			control_header->h.function = 0xb;
+			control_header->h.endpoint = 1 << 7;
+			control_header->h.info = 1;
+			control_header->h.transfer = 2;
+			control_header->h.data_len = ssize;
+			control_header->stage = 1;
+
+			if (ssize != 0)
+			{
+				memcpy(data_buf, buf, ssize);
+			}
+
+			offset += sizeof(pcap_record_header) + sizeof(linktype_usbpcap_control_header) + ssize;
+
+			int write_status = fwrite(capture_buffer, offset, 1, capture_file);
+			if (write_status != 1)
+			{
+				sys_usbd.error("Failed writing to %s, stopping usb passthrough capture\n", capture_file_path.c_str());
+				fclose(capture_file);
+				capture_file = nullptr;
+			}
+
+		}
+		capture_file_mutex.unlock();
+
 		// Minimalistic parse
 		auto& conf = device.add_node(UsbDescriptorNode(buf[0], buf[1], &buf[2]));
 
