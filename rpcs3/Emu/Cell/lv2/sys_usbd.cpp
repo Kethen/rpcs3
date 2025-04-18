@@ -38,6 +38,7 @@
 #include "Emu/Io/usio.h"
 #include "Emu/Io/usio_config.h"
 #include "Emu/Io/midi_config_types.h"
+#include "Emu/Io/LogitechG27.h"
 
 #include <libusb.h>
 
@@ -208,7 +209,7 @@ private:
 
 
 		// GT5 Wheels&co
-		{0x046D, 0xC283, 0xC29B, "lgFF_c283_c29b", nullptr, nullptr},
+		{0x046D, 0xC283, 0xC29B, "lgFF_c283_c29b", &usb_device_logitech_g27::get_num_emu_devices, &usb_device_logitech_g27::make_instance},
 		{0x044F, 0xB653, 0xB653, "Thrustmaster RGT FFB Pro", nullptr, nullptr},
 		{0x044F, 0xB65A, 0xB65A, "Thrustmaster F430", nullptr, nullptr},
 		{0x044F, 0xB65D, 0xB65D, "Thrustmaster FFB", nullptr, nullptr},
