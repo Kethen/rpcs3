@@ -16,6 +16,8 @@
 #endif
 
 #include "Emu/Cell/lv2/sys_usbd.h"
+#include <chrono>
+#include <mutex>
 
 struct UsbTransfer;
 
@@ -219,12 +221,20 @@ public:
 	void interrupt_transfer(u32 buf_size, u8* buf, u32 endpoint, UsbTransfer* transfer) override;
 	void isochronous_transfer(UsbTransfer* transfer) override;
 
+	void capture_transfer(const libusb_transfer* transfer);
+
 protected:
 	void send_libusb_transfer(libusb_transfer* transfer);
 
 protected:
 	libusb_device* lusb_device        = nullptr;
 	libusb_device_handle* lusb_handle = nullptr;
+
+protected:
+	std::mutex capture_file_mutex;
+	FILE *capture_file = nullptr;
+	std::string capture_file_path;
+	std::chrono::high_resolution_clock::time_point capture_begin;
 };
 
 class usb_device_emulated : public usb_device
