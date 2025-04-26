@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Emu/Io/usb_device.h"
+#include "Input/sdl_pad_handler.h"
 #include "SDL3/SDL.h"
 #include <mutex>
 #include <map>
@@ -26,7 +27,7 @@ enum sdl_mapping_type
 {
 	MAPPING_BUTTON,
 	MAPPING_HAT,
-	MAPPING_AXIS
+	MAPPING_AXIS,
 };
 
 enum hat_component
@@ -57,8 +58,6 @@ struct logitech_g27_sdl_mapping
 	sdl_mapping shift_up;
 	sdl_mapping shift_down;
 
-	// TODO integrated shifter
-
 	sdl_mapping up;
 	sdl_mapping down;
 	sdl_mapping left;
@@ -83,6 +82,14 @@ struct logitech_g27_sdl_mapping
 
 	sdl_mapping select;
 	sdl_mapping pause;
+
+	sdl_mapping shifter_1;
+	sdl_mapping shifter_2;
+	sdl_mapping shifter_3;
+	sdl_mapping shifter_4;
+	sdl_mapping shifter_5;
+	sdl_mapping shifter_6;
+	sdl_mapping shifter_r;
 };
 
 class usb_device_logitech_g27 : public usb_device_emulated
@@ -117,4 +124,7 @@ private:
 	logitech_g27_ffb_slot effect_slots[4];
 	SDL_HapticEffect default_spring_effect = {0};
 	int default_spring_effect_id = -1;
+
+	// just to initialize the global sdl instance
+	sdl_pad_handler pad_handler;
 };

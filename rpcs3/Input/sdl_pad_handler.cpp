@@ -5,6 +5,7 @@
 #include "Emu/system_utils.hpp"
 #include "Emu/system_config.h"
 #include "Emu/System.h"
+#include "pad_thread.h"
 
 #include <mutex>
 
@@ -314,7 +315,9 @@ void sdl_pad_handler::process()
 	if (!m_is_init)
 		return;
 
+	pad::g_pad_mutex.lock();
 	SDL_PumpEvents();
+	pad::g_pad_mutex.unlock();
 
 	PadHandlerBase::process();
 }
@@ -771,7 +774,9 @@ void sdl_pad_handler::get_motion_sensors(const std::string& pad_id, const motion
 	if (!m_is_init)
 		return;
 
+	pad::g_pad_mutex.lock();
 	SDL_PumpEvents();
+	pad::g_pad_mutex.unlock();
 
 	PadHandlerBase::get_motion_sensors(pad_id, callback, fail_callback, preview_values, sensors);
 }
@@ -781,7 +786,9 @@ PadHandlerBase::connection sdl_pad_handler::get_next_button_press(const std::str
 	if (!m_is_init)
 		return connection::disconnected;
 
+	pad::g_pad_mutex.lock();
 	SDL_PumpEvents();
+	pad::g_pad_mutex.unlock();
 
 	return PadHandlerBase::get_next_button_press(padId, callback, fail_callback, call_type, buttons);
 }

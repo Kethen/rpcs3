@@ -1,5 +1,12 @@
 // Logitech G27
 
+// ffb ref
+// https://opensource.logitech.com/wiki/force_feedback/Logitech_Force_Feedback_Protocol_V1.6.pdf
+// https://github.com/mathijsvandenberg/g29emu/files/14395098/Logitech_Force_Feedback_Protocol_V1.6.pdf
+
+// shifter input ref
+// https://github.com/sonik-br/lgff_wheel_adapter/blob/d97f7823154818e1b3edff6d51498a122c302728/pico_lgff_wheel_adapter/reports.h#L265-L310
+
 #ifdef HAVE_SDL3
 
 #include "stdafx.h"
@@ -9,6 +16,7 @@
 #include "LogitechG27.h"
 #include "Emu/Cell/lv2/sys_usbd.h"
 #include "Emu/system_config.h"
+#include "Input/pad_thread.h"
 
 LOG_CHANNEL(logitech_g27_log, "LOGIG27");
 
@@ -79,6 +87,11 @@ usb_device_logitech_g27::usb_device_logitech_g27(u32 controller_index, const std
 	{
 		logitech_g27_log.error("Failed creating sdl housekeeping thread, %s", SDL_GetError());
 	}
+
+	// force global sdl init
+	pad::g_pad_mutex.lock();
+	pad_handler.Init();
+	pad::g_pad_mutex.unlock();
 }
 
 static void clear_sdl_joysticks(std::map<uint32_t, std::vector<SDL_Joystick *>> &joysticks)
@@ -331,6 +344,14 @@ void usb_device_logitech_g27::sdl_refresh()
 
 	set_sdl_mapping_button(mapping.select, 0x046dc24f, 8, false);
 	set_sdl_mapping_button(mapping.pause, 0x046dc24f, 9, false);
+
+	set_sdl_mapping_button(mapping.shifter_1, 0x045e028e, 3, false);
+	set_sdl_mapping_button(mapping.shifter_2, 0x045e028e, 0, false);
+	set_sdl_mapping_button(mapping.shifter_3, 0x045e028e, 2, false);
+	set_sdl_mapping_button(mapping.shifter_4, 0x045e028e, 1, false);
+	set_sdl_mapping_hat(mapping.shifter_5, 0x045e028e, 0, HAT_UP, false);
+	set_sdl_mapping_hat(mapping.shifter_6, 0x045e028e, 0, HAT_DOWN, false);
+	set_sdl_mapping_hat(mapping.shifter_r, 0x045e028e, 0, HAT_LEFT, false);
 
 	// TODO change effect direction from cfg
 	reverse_effects = true;
@@ -672,9 +693,10 @@ void usb_device_logitech_g27::interrupt_transfer(u32 buf_size, u8* buf, u32 endp
 
 		transfer->expected_count = 11;
 
-		buf[8] = 0x80; // unknown
-		buf[9] = 0x80; // unknown
-		buf[10] = wheel_range > 360 ? 0x94 : 0x14;
+		// pump sdl events
+		pad::g_pad_mutex.lock();
+		SDL_PumpEvents();
+		pad::g_pad_mutex.unlock();
 
 		// Fetch input states from SDL
 		sdl_handles_mutex.lock();
@@ -708,6 +730,14 @@ void usb_device_logitech_g27::interrupt_transfer(u32 buf_size, u8* buf, u32 endp
 
 		bool select = sdl_to_logitech_g27_button(joysticks, mapping.select);
 		bool pause = sdl_to_logitech_g27_button(joysticks, mapping.pause);
+
+		bool shifter_1 = sdl_to_logitech_g27_button(joysticks, mapping.shifter_1);
+		bool shifter_2 = sdl_to_logitech_g27_button(joysticks, mapping.shifter_2);
+		bool shifter_3 = sdl_to_logitech_g27_button(joysticks, mapping.shifter_3);
+		bool shifter_4 = sdl_to_logitech_g27_button(joysticks, mapping.shifter_4);
+		bool shifter_5 = sdl_to_logitech_g27_button(joysticks, mapping.shifter_5);
+		bool shifter_6 = sdl_to_logitech_g27_button(joysticks, mapping.shifter_6);
+		bool shifter_r = sdl_to_logitech_g27_button(joysticks, mapping.shifter_r);
 		sdl_handles_mutex.unlock();
 
 		// populate buffer
@@ -725,8 +755,6 @@ void usb_device_logitech_g27::interrupt_transfer(u32 buf_size, u8* buf, u32 endp
 		set_bit(buf, 10, r2);
 		set_bit(buf, 14, r3);
 
-		// TODO guessing 16 - 21 bits are shifter
-
 		set_bit(buf, 22, dial_clockwise);
 		set_bit(buf, 23, dial_anticlockwise);
 
@@ -736,13 +764,32 @@ void usb_device_logitech_g27::interrupt_transfer(u32 buf_size, u8* buf, u32 endp
 		set_bit(buf, 12, select);
 		set_bit(buf, 13, pause);
 
+		set_bit(buf, 16, shifter_1);
+		set_bit(buf, 17, shifter_2);
+		set_bit(buf, 18, shifter_3);
+		set_bit(buf, 19, shifter_4);
+		set_bit(buf, 20, shifter_5);
+		set_bit(buf, 21, shifter_6);
+		set_bit(buf, 80, shifter_r);
+
+		// calibrated, unsure
+		set_bit(buf, 82, true);
+		// shifter connected
+		set_bit(buf, 83, true);
+		// shifter stick down
+		set_bit(buf, 86, shifter_1 || shifter_2 || shifter_3 || shifter_4 || shifter_5 || shifter_6 || shifter_r);
+
 		buf[3] = (steering << 2) | buf[3];
 		buf[4] = steering >> 6;
 		buf[5] = throttle;
 		buf[6] = brake;
 		buf[7] = clutch;
 
-		// logitech_g27_log.error("%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7], buf[8], buf[9], buf[10]);
+		buf[8] = 0x80; // shifter x, don't own one to test gear/coord mapping
+		buf[9] = 0x80; // shifter y
+		buf[10] = buf[10] | (wheel_range > 360 ? 0x90 : 0x10);
+
+		//logitech_g27_log.error("%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7], buf[8], buf[9], buf[10]);
 
 		return;
 	}
