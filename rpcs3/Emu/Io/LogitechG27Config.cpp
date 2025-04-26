@@ -5,68 +5,146 @@ emulated_logitech_g27_config g_cfg_logitech_g27;
 
 LOG_CHANNEL(cfg_log, "CFG");
 
-void emulated_logitech_g27_config::fill_defaults(){
-	#define INIT_AXIS_MAPPING(name) \
+logitech_g27_sdl_mapping emulated_logitech_g27_config::to_runtime_mapping()
+{
+	logitech_g27_sdl_mapping mapping;
+
+	m_mutex.lock();
+
+	#define CONVERT_MAPPING(name) \
 	{ \
-		name##_device_type_id.set(0); \
-		name##_type.set(MAPPING_AXIS); \
-		name##_id.set(0); \
-		name##_hat.set(HAT_NONE); \
-		name##_reverse.set(false); \
+		mapping.name.device_type_id = name##_device_type_id.get(); \
+		mapping.name.type = static_cast<sdl_mapping_type>(name##_type.get()); \
+		mapping.name.id = static_cast<uint8_t>(name##_id.get()); \
+		mapping.name.hat = static_cast<hat_component>(name##_hat.get()); \
+		mapping.name.reverse = name##_reverse.get(); \
+		mapping.name.positive_axis = false; \
 	}
 
-	INIT_AXIS_MAPPING(steering);
-	INIT_AXIS_MAPPING(throttle);
-	INIT_AXIS_MAPPING(brake);
-	INIT_AXIS_MAPPING(clutch);
+	CONVERT_MAPPING(steering);
+	CONVERT_MAPPING(throttle);
+	CONVERT_MAPPING(brake);
+	CONVERT_MAPPING(clutch);
+	CONVERT_MAPPING(shift_up);
+	CONVERT_MAPPING(shift_down);
+
+	CONVERT_MAPPING(up);
+	CONVERT_MAPPING(down);
+	CONVERT_MAPPING(left);
+	CONVERT_MAPPING(right);
+
+	CONVERT_MAPPING(triangle);
+	CONVERT_MAPPING(cross);
+	CONVERT_MAPPING(square);
+	CONVERT_MAPPING(circle);
+
+	CONVERT_MAPPING(l2);
+	CONVERT_MAPPING(l3);
+	CONVERT_MAPPING(r2);
+	CONVERT_MAPPING(r3);
+
+	CONVERT_MAPPING(plus);
+	CONVERT_MAPPING(minus);
+
+	CONVERT_MAPPING(dial_clockwise);
+	CONVERT_MAPPING(dial_anticlockwise);
+
+	CONVERT_MAPPING(select);
+	CONVERT_MAPPING(pause);
+
+	CONVERT_MAPPING(shifter_1);
+	CONVERT_MAPPING(shifter_2);
+	CONVERT_MAPPING(shifter_3);
+	CONVERT_MAPPING(shifter_4);
+	CONVERT_MAPPING(shifter_5);
+	CONVERT_MAPPING(shifter_6);
+	CONVERT_MAPPING(shifter_r);
+
+	#undef CONVERT_MAPPING
+
+	m_mutex.unlock();
+
+	return mapping;
+}
+
+void emulated_logitech_g27_config::fill_defaults(){
+	// a shifter-less g29 with a xbox 360 controller shifter place holder...
+
+	#define INIT_AXIS_MAPPING(name, device_type_id, id, reverse) \
+	{ \
+		name##_device_type_id.set(device_type_id); \
+		name##_type.set(MAPPING_AXIS); \
+		name##_id.set(id); \
+		name##_hat.set(HAT_NONE); \
+		name##_reverse.set(reverse); \
+	}
+
+	INIT_AXIS_MAPPING(steering, 0x046dc24f, 0, false);
+	INIT_AXIS_MAPPING(throttle, 0x046dc24f, 2, false);
+	INIT_AXIS_MAPPING(brake, 0x046dc24f, 3, false);
+	INIT_AXIS_MAPPING(clutch, 0x046dc24f, 1, false);
 
 	#undef INIT_AXIS_MAPPING
 
-	#define INIT_BUTTON_MAPPING(name) \
+	#define INIT_BUTTON_MAPPING(name, device_type_id, id, reverse) \
 	{ \
-		name##_device_type_id.set(0); \
+		name##_device_type_id.set(device_type_id); \
 		name##_type.set(MAPPING_BUTTON); \
-		name##_id.set(0); \
+		name##_id.set(id); \
 		name##_hat.set(HAT_NONE); \
-		name##_reverse.set(false); \
+		name##_reverse.set(reverse); \
 	}
 
-	INIT_BUTTON_MAPPING(shift_up);
-	INIT_BUTTON_MAPPING(shift_down);
+	INIT_BUTTON_MAPPING(shift_up, 0x046dc24f, 4, false);
+	INIT_BUTTON_MAPPING(shift_down, 0x046dc24f, 5, false);
 
-	INIT_BUTTON_MAPPING(up);
-	INIT_BUTTON_MAPPING(down);
-	INIT_BUTTON_MAPPING(left);
-	INIT_BUTTON_MAPPING(right);
+	INIT_BUTTON_MAPPING(triangle, 0x046dc24f, 3, false);
+	INIT_BUTTON_MAPPING(cross, 0x046dc24f, 0, false);
+	INIT_BUTTON_MAPPING(square, 0x046dc24f, 1, false);
+	INIT_BUTTON_MAPPING(circle, 0x046dc24f, 2, false);
 
-	INIT_BUTTON_MAPPING(triangle);
-	INIT_BUTTON_MAPPING(cross);
-	INIT_BUTTON_MAPPING(square);
-	INIT_BUTTON_MAPPING(circle);
+	INIT_BUTTON_MAPPING(l2, 0x046dc24f, 7, false);
+	INIT_BUTTON_MAPPING(l3, 0x046dc24f, 11, false);
+	INIT_BUTTON_MAPPING(r2, 0x046dc24f, 6, false);
+	INIT_BUTTON_MAPPING(r3, 0x046dc24f, 10, false);
 
-	INIT_BUTTON_MAPPING(l2);
-	INIT_BUTTON_MAPPING(l3);
-	INIT_BUTTON_MAPPING(r2);
-	INIT_BUTTON_MAPPING(r3);
+	INIT_BUTTON_MAPPING(plus, 0x046dc24f, 19, false);
+	INIT_BUTTON_MAPPING(minus, 0x046dc24f, 20, false);
 
-	INIT_BUTTON_MAPPING(plus);
-	INIT_BUTTON_MAPPING(minus);
+	INIT_BUTTON_MAPPING(dial_clockwise, 0x046dc24f, 21, false);
+	INIT_BUTTON_MAPPING(dial_anticlockwise, 0x046dc24f, 22, false);
 
-	INIT_BUTTON_MAPPING(dial_clockwise);
-	INIT_BUTTON_MAPPING(dial_anticlockwise);
+	INIT_BUTTON_MAPPING(select, 0x046dc24f, 8, false);
+	INIT_BUTTON_MAPPING(pause, 0x046dc24f, 9, false);
 
-	INIT_BUTTON_MAPPING(select);
-	INIT_BUTTON_MAPPING(pause);
-
-	INIT_BUTTON_MAPPING(shifter_1);
-	INIT_BUTTON_MAPPING(shifter_2);
-	INIT_BUTTON_MAPPING(shifter_3);
-	INIT_BUTTON_MAPPING(shifter_4);
-	INIT_BUTTON_MAPPING(shifter_5);
-	INIT_BUTTON_MAPPING(shifter_6);
-	INIT_BUTTON_MAPPING(shifter_r);
+	INIT_BUTTON_MAPPING(shifter_1, 0x045e028e, 3, false);
+	INIT_BUTTON_MAPPING(shifter_2, 0x045e028e, 0, false);
+	INIT_BUTTON_MAPPING(shifter_3, 0x045e028e, 2, false);
+	INIT_BUTTON_MAPPING(shifter_4, 0x045e028e, 1, false);
 
 	#undef INIT_BUTTON_MAPPING
+
+	#define INIT_HAT_MAPPING(name, device_type_id, id, hat, reverse) \
+	{ \
+		name##_device_type_id.set(device_type_id); \
+		name##_type.set(MAPPING_HAT); \
+		name##_id.set(id); \
+		name##_hat.set(hat); \
+		name##_reverse.set(reverse); \
+	}
+
+	INIT_HAT_MAPPING(up, 0x046dc24f, 0, HAT_UP, false);
+	INIT_HAT_MAPPING(down, 0x046dc24f, 0, HAT_DOWN, false);
+	INIT_HAT_MAPPING(left, 0x046dc24f, 0, HAT_LEFT, false);
+	INIT_HAT_MAPPING(right, 0x046dc24f, 0, HAT_RIGHT, false);
+
+	INIT_HAT_MAPPING(shifter_5, 0x045e028e, 0, HAT_UP, false);
+	INIT_HAT_MAPPING(shifter_6, 0x045e028e, 0, HAT_DOWN, false);
+	INIT_HAT_MAPPING(shifter_r, 0x045e028e, 0, HAT_LEFT, false);
+
+	#undef INIT_HAT_MAPPING
+
+	reverse_effects.set(true);
 }
 
 void emulated_logitech_g27_config::save(){

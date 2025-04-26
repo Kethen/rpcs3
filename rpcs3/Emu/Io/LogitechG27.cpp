@@ -82,6 +82,8 @@ usb_device_logitech_g27::usb_device_logitech_g27(u32 controller_index, const std
 	stop_thread = false;
 	thread_control_mutex.unlock();
 
+	g_cfg_logitech_g27.load();
+
 	sprintf(thread_name, "LogiG27 %p", this);
 	thread = SDL_CreateThread(refresh_thread, thread_name, this);
 	if (thread == nullptr)
@@ -180,31 +182,6 @@ static bool sdl_joysticks_equal(std::map<uint32_t, std::vector<SDL_Joystick *>> 
 		}
 	}
 	return true;
-}
-
-static void set_sdl_mapping(sdl_mapping &mapping, uint32_t device_type_id, sdl_mapping_type type, int id, hat_component hat, bool reverse, bool positive_axis)
-{
-	mapping.device_type_id = device_type_id;
-	mapping.type = type;
-	mapping.id = id;
-	mapping.hat = hat;
-	mapping.reverse = reverse;
-	mapping.positive_axis = positive_axis;
-}
-
-static void set_sdl_mapping_axis(sdl_mapping &mapping, uint32_t device_type_id, int id, bool reverse)
-{
-	set_sdl_mapping(mapping, device_type_id, MAPPING_AXIS, id, HAT_NONE, reverse, false);
-}
-
-static void set_sdl_mapping_hat(sdl_mapping &mapping, uint32_t device_type_id, int id, hat_component hat, bool reverse)
-{
-	set_sdl_mapping(mapping, device_type_id, MAPPING_HAT, id, hat, reverse, false);
-}
-
-static void set_sdl_mapping_button(sdl_mapping &mapping, uint32_t device_type_id, int id, bool reverse)
-{
-	set_sdl_mapping(mapping, device_type_id, MAPPING_BUTTON, id, HAT_NONE, reverse, false);
 }
 
 void usb_device_logitech_g27::sdl_refresh()
@@ -314,49 +291,9 @@ void usb_device_logitech_g27::sdl_refresh()
 		SDL_CloseHaptic(new_haptic_handle);
 	}
 
-	// TODO update mapping from actual cfg
-	set_sdl_mapping_axis(mapping.steering, 0x046dc24f, 0, false);
-	set_sdl_mapping_axis(mapping.throttle, 0x046dc24f, 2, false);
-	set_sdl_mapping_axis(mapping.brake, 0x046dc24f, 3, false);
-	set_sdl_mapping_axis(mapping.clutch, 0x046dc24f, 1, false);
-	set_sdl_mapping_button(mapping.shift_up, 0x046dc24f, 4, false);
-	set_sdl_mapping_button(mapping.shift_down, 0x046dc24f, 5, false);
+	mapping = g_cfg_logitech_g27.to_runtime_mapping();
 
-	set_sdl_mapping_hat(mapping.up, 0x046dc24f, 0, HAT_UP, false);
-	set_sdl_mapping_hat(mapping.down, 0x046dc24f, 0, HAT_DOWN, false);
-	set_sdl_mapping_hat(mapping.left, 0x046dc24f, 0, HAT_LEFT, false);
-	set_sdl_mapping_hat(mapping.right, 0x046dc24f, 0, HAT_RIGHT, false);
-
-	set_sdl_mapping_button(mapping.triangle, 0x046dc24f, 3, false);
-	set_sdl_mapping_button(mapping.cross, 0x046dc24f, 0, false);
-	set_sdl_mapping_button(mapping.square, 0x046dc24f, 1, false);
-	set_sdl_mapping_button(mapping.circle, 0x046dc24f, 2, false);
-
-	set_sdl_mapping_button(mapping.l2, 0x046dc24f, 7, false);
-	set_sdl_mapping_button(mapping.l3, 0x046dc24f, 11, false);
-	set_sdl_mapping_button(mapping.r2, 0x046dc24f, 6, false);
-	set_sdl_mapping_button(mapping.r3, 0x046dc24f, 10, false);
-
-	set_sdl_mapping_button(mapping.plus, 0x046dc24f, 19, false);
-	set_sdl_mapping_button(mapping.minus, 0x046dc24f, 20, false);
-
-	set_sdl_mapping_button(mapping.dial_clockwise, 0x046dc24f, 21, false);
-	set_sdl_mapping_button(mapping.dial_anticlockwise, 0x046dc24f, 22, false);
-
-	set_sdl_mapping_button(mapping.select, 0x046dc24f, 8, false);
-	set_sdl_mapping_button(mapping.pause, 0x046dc24f, 9, false);
-
-	set_sdl_mapping_button(mapping.shifter_1, 0x045e028e, 3, false);
-	set_sdl_mapping_button(mapping.shifter_2, 0x045e028e, 0, false);
-	set_sdl_mapping_button(mapping.shifter_3, 0x045e028e, 2, false);
-	set_sdl_mapping_button(mapping.shifter_4, 0x045e028e, 1, false);
-	set_sdl_mapping_hat(mapping.shifter_5, 0x045e028e, 0, HAT_UP, false);
-	set_sdl_mapping_hat(mapping.shifter_6, 0x045e028e, 0, HAT_DOWN, false);
-	set_sdl_mapping_hat(mapping.shifter_r, 0x045e028e, 0, HAT_LEFT, false);
-
-	// TODO change effect direction from cfg
-	reverse_effects = true;
-	// TODO force clipping from cfg?
+	reverse_effects = g_cfg_logitech_g27.reverse_effects.get();
 }
 
 static inline int16_t logitech_g27_force_to_level(uint8_t force)

@@ -136,6 +136,7 @@ struct emulated_logitech_g27_config : cfg::node {
 	bool load();
 	void save();
 	void fill_defaults();
+	logitech_g27_sdl_mapping to_runtime_mapping();
 
 	#define STR(s) #s
 	#define MAPPING_ENTRY(name) \
@@ -185,4 +186,9 @@ struct emulated_logitech_g27_config : cfg::node {
 	MAPPING_ENTRY(shifter_r);
 
 	#undef MAPPING_ENTRY
+	#undef STR
+
+	cfg::_bool reverse_effects{this, "reverse_effects"};
 };
+
+extern emulated_logitech_g27_config g_cfg_logitech_g27;
