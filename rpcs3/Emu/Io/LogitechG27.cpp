@@ -7,9 +7,10 @@
 // shifter input ref
 // https://github.com/sonik-br/lgff_wheel_adapter/blob/d97f7823154818e1b3edff6d51498a122c302728/pico_lgff_wheel_adapter/reports.h#L265-L310
 
-#ifdef HAVE_SDL3
 
 #include "stdafx.h"
+
+#ifdef HAVE_SDL3
 
 #include <thread>
 
