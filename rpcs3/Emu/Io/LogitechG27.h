@@ -109,7 +109,7 @@ private:
 	bool reverse_effects;
 
 	std::mutex sdl_handles_mutex;
-	SDL_Joystick *ffb_joystick_handle = nullptr;
+	SDL_Joystick *led_joystick_handle = nullptr;
 	SDL_Haptic *haptic_handle = nullptr;
 	std::map<uint32_t, std::vector<SDL_Joystick *>> joysticks;
 	bool fixed_loop = false;

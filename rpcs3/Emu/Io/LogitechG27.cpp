@@ -196,10 +196,13 @@ static void set_sdl_mapping_button(sdl_mapping &mapping, uint32_t device_type_id
 void usb_device_logitech_g27::sdl_refresh()
 {
 	// TODO Read target device product and vendor id from config
-	uint32_t vendor_id = 0x046d;
-	uint32_t product_id = 0xc24f;
+	uint32_t ffb_vendor_id = 0x046d;
+	uint32_t ffb_product_id = 0xc24f;
 
-	SDL_Joystick *new_ffb_joystick_handle = nullptr;
+	uint32_t led_vendor_id = 0x046d;
+	uint32_t led_product_id = 0xc24f;
+
+	SDL_Joystick *new_led_joystick_handle = nullptr;
 	SDL_Haptic *new_haptic_handle = nullptr;
 	std::map<uint32_t, std::vector<SDL_Joystick *>> new_joysticks;
 
@@ -230,17 +233,22 @@ void usb_device_logitech_g27::sdl_refresh()
 				joysticks_of_type->second.push_back(cur_joystick);
 			}
 
-			if (cur_vendor_id == vendor_id && cur_product_id == product_id && new_haptic_handle == nullptr)
+			if (cur_vendor_id == ffb_vendor_id && cur_product_id == ffb_product_id && new_haptic_handle == nullptr)
 			{
 				SDL_Haptic *cur_haptic = SDL_OpenHapticFromJoystick(cur_joystick);
 				if (cur_haptic == nullptr)
 				{
-					logitech_g27_log.error("Failed opening haptic device from selected ffb device %04x:%04x", vendor_id, product_id);
+					logitech_g27_log.error("Failed opening haptic device from selected ffb device %04x:%04x", cur_vendor_id, cur_product_id);
 				}
+				else
+				{
+					new_haptic_handle = cur_haptic;
+				}
+			}
 
-				// update ffb handles even if haptic cannot be opened, for having rev light on a sdl led equipped controller
-				new_ffb_joystick_handle = cur_joystick;
-				new_haptic_handle = cur_haptic;
+			if (cur_vendor_id == led_vendor_id && cur_product_id == led_product_id && new_led_joystick_handle == nullptr)
+			{
+				new_led_joystick_handle = cur_joystick;
 			}
 		}
 	}
@@ -251,10 +259,11 @@ void usb_device_logitech_g27::sdl_refresh()
 	// SDL_UnlockJoysticks();
 
 	bool joysticks_changed = !sdl_joysticks_equal(joysticks, new_joysticks);
-	bool haptic_changed = haptic_handle != new_haptic_handle || ffb_joystick_handle != new_ffb_joystick_handle;
+	bool haptic_changed = haptic_handle != new_haptic_handle;
+	bool led_joystick_changed = led_joystick_handle != new_led_joystick_handle;
 
 	// if we should touch the mutex
-	if (joysticks_changed || haptic_changed)
+	if (joysticks_changed || haptic_changed || led_joystick_changed)
 	{
 		sdl_handles_mutex.lock();
 		if (joysticks_changed)
@@ -271,8 +280,12 @@ void usb_device_logitech_g27::sdl_refresh()
 				effect_slots[i].effect_id = -1;
 			}
 			default_spring_effect_id = -1;
-			ffb_joystick_handle = new_ffb_joystick_handle;
+			led_joystick_handle = new_led_joystick_handle;
 			haptic_handle = new_haptic_handle;
+		}
+		if (led_joystick_changed)
+		{
+			led_joystick_handle = new_led_joystick_handle;
 		}
 		sdl_handles_mutex.unlock();
 	}
@@ -822,7 +835,7 @@ void usb_device_logitech_g27::interrupt_transfer(u32 buf_size, u8* buf, u32 endp
 				case 0x12:
 				{
 					// Incoming data is a 5 bit mask, for each individual bulb
-					if (ffb_joystick_handle == nullptr)
+					if (led_joystick_handle == nullptr)
 					{
 						break;
 					}
@@ -832,11 +845,9 @@ void usb_device_logitech_g27::interrupt_transfer(u32 buf_size, u8* buf, u32 endp
 					{
 						new_led_level += (buf[2] & (1 << i)) ? 1 : 0;
 					}
-					if (ffb_joystick_handle != nullptr)
-					{
-						uint8_t intensity = new_led_level * 255 / 5;
-						SDL_SetJoystickLED(ffb_joystick_handle, intensity, intensity, intensity);
-					}
+
+					uint8_t intensity = new_led_level * 255 / 5;
+					SDL_SetJoystickLED(led_joystick_handle, intensity, intensity, intensity);
 					break;
 				}
 				case 0x81:
@@ -1440,7 +1451,7 @@ void usb_device_logitech_g27::interrupt_transfer(u32 buf_size, u8* buf, u32 endp
 				case 0x09:
 				{
 					// Set LED
-					if (ffb_joystick_handle == nullptr)
+					if (led_joystick_handle == nullptr)
 					{
 						break;
 					}
@@ -1451,7 +1462,7 @@ void usb_device_logitech_g27::interrupt_transfer(u32 buf_size, u8* buf, u32 endp
 						new_led_level += (buf[1] & (1 << i)) ? 1 : 0;
 					}
 					uint8_t intensity = new_led_level * 255 / 7;
-					SDL_SetJoystickLED(ffb_joystick_handle, intensity, intensity, intensity);
+					SDL_SetJoystickLED(led_joystick_handle, intensity, intensity, intensity);
 					break;
 				}
 				case 0x0a:
