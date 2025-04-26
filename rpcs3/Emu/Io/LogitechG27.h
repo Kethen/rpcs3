@@ -2,6 +2,8 @@
 
 #include "Emu/Io/usb_device.h"
 #include "Input/sdl_pad_handler.h"
+#include "Utilities/Config.h"
+
 #include "SDL3/SDL.h"
 #include <mutex>
 #include <map>
@@ -25,14 +27,14 @@ struct logitech_g27_ffb_slot
 // TODO maybe push these into cfg
 enum sdl_mapping_type
 {
-	MAPPING_BUTTON,
+	MAPPING_BUTTON = 0,
 	MAPPING_HAT,
 	MAPPING_AXIS,
 };
 
 enum hat_component
 {
-	HAT_NONE,
+	HAT_NONE = 0,
 	HAT_UP,
 	HAT_DOWN,
 	HAT_LEFT,
@@ -43,7 +45,7 @@ struct sdl_mapping
 {
 	uint32_t device_type_id; // (vendor_id << 16) | product_id
 	sdl_mapping_type type;
-	int id;
+	uint8_t id;
 	hat_component hat;
 	bool reverse;
 	bool positive_axis;
@@ -127,4 +129,60 @@ private:
 
 	// just to initialize the global sdl instance
 	sdl_pad_handler pad_handler;
+};
+
+struct emulated_logitech_g27_config : cfg::node {
+	std::mutex m_mutex;
+	bool load();
+	void save();
+	void fill_defaults();
+
+	#define STR(s) #s
+	#define MAPPING_ENTRY(name) \
+		cfg::uint<0, 0xFFFFFFFF> name##_device_type_id{this, STR(name##_device_type_id)}; \
+		cfg::uint<0, 0xFFFFFFFF> name##_type{this, STR(name##_type)}; \
+		cfg::uint<0, 0xFF> name##_id{this, STR(name##_id)}; \
+		cfg::uint<0, 0xFFFFFFFF> name##_hat{this, STR(name##_hat)}; \
+		cfg::_bool name##_reverse{this, STR(name##_reverse)};
+
+	MAPPING_ENTRY(steering);
+	MAPPING_ENTRY(throttle);
+	MAPPING_ENTRY(brake);
+	MAPPING_ENTRY(clutch);
+	MAPPING_ENTRY(shift_up);
+	MAPPING_ENTRY(shift_down);
+
+	MAPPING_ENTRY(up);
+	MAPPING_ENTRY(down);
+	MAPPING_ENTRY(left);
+	MAPPING_ENTRY(right);
+
+	MAPPING_ENTRY(triangle);
+	MAPPING_ENTRY(cross);
+	MAPPING_ENTRY(square);
+	MAPPING_ENTRY(circle);
+
+	MAPPING_ENTRY(l2);
+	MAPPING_ENTRY(l3);
+	MAPPING_ENTRY(r2);
+	MAPPING_ENTRY(r3);
+
+	MAPPING_ENTRY(plus);
+	MAPPING_ENTRY(minus);
+
+	MAPPING_ENTRY(dial_clockwise);
+	MAPPING_ENTRY(dial_anticlockwise);
+
+	MAPPING_ENTRY(select);
+	MAPPING_ENTRY(pause);
+
+	MAPPING_ENTRY(shifter_1);
+	MAPPING_ENTRY(shifter_2);
+	MAPPING_ENTRY(shifter_3);
+	MAPPING_ENTRY(shifter_4);
+	MAPPING_ENTRY(shifter_5);
+	MAPPING_ENTRY(shifter_6);
+	MAPPING_ENTRY(shifter_r);
+
+	#undef MAPPING_ENTRY
 };

@@ -419,6 +419,7 @@ target_sources(rpcs3_emu PRIVATE
     Io/usb_vfs.cpp
     Io/usio.cpp
     Io/LogitechG27.cpp
+    Io/LogitechG27Config.cpp
 )
 
 # Np
