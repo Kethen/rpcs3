@@ -9,8 +9,6 @@ logitech_g27_sdl_mapping emulated_logitech_g27_config::to_runtime_mapping()
 {
 	logitech_g27_sdl_mapping mapping;
 
-	m_mutex.lock();
-
 	#define CONVERT_MAPPING(name) \
 	{ \
 		mapping.name.device_type_id = name##_device_type_id.get(); \
@@ -61,8 +59,6 @@ logitech_g27_sdl_mapping emulated_logitech_g27_config::to_runtime_mapping()
 	CONVERT_MAPPING(shifter_r);
 
 	#undef CONVERT_MAPPING
-
-	m_mutex.unlock();
 
 	return mapping;
 }
@@ -145,6 +141,8 @@ void emulated_logitech_g27_config::fill_defaults(){
 	#undef INIT_HAT_MAPPING
 
 	reverse_effects.set(true);
+	ffb_device_type_id.set(0x046dc24f);
+	led_device_type_id.set(0x046dc24f);
 }
 
 void emulated_logitech_g27_config::save(){

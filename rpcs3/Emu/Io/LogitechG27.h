@@ -189,6 +189,8 @@ struct emulated_logitech_g27_config : cfg::node {
 	#undef STR
 
 	cfg::_bool reverse_effects{this, "reverse_effects"};
+	cfg::uint<0, 0xFFFFFFFF> ffb_device_type_id{this, "ffb_device_type_id"};
+	cfg::uint<0, 0xFFFFFFFF> led_device_type_id{this, "led_device_type_id"};
 };
 
 extern emulated_logitech_g27_config g_cfg_logitech_g27;

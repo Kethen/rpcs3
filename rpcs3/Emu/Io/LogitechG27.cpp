@@ -186,12 +186,18 @@ static bool sdl_joysticks_equal(std::map<uint32_t, std::vector<SDL_Joystick *>> 
 
 void usb_device_logitech_g27::sdl_refresh()
 {
-	// TODO Read target device product and vendor id from config
-	uint32_t ffb_vendor_id = 0x046d;
-	uint32_t ffb_product_id = 0xc24f;
+	g_cfg_logitech_g27.m_mutex.lock();
+	mapping = g_cfg_logitech_g27.to_runtime_mapping();
 
-	uint32_t led_vendor_id = 0x046d;
-	uint32_t led_product_id = 0xc24f;
+	reverse_effects = g_cfg_logitech_g27.reverse_effects.get();
+
+	uint32_t ffb_vendor_id = g_cfg_logitech_g27.ffb_device_type_id.get() >> 16;
+	uint32_t ffb_product_id = g_cfg_logitech_g27.ffb_device_type_id.get() & 0xFFFF;
+
+	uint32_t led_vendor_id = g_cfg_logitech_g27.led_device_type_id.get() >> 16;
+	uint32_t led_product_id = g_cfg_logitech_g27.led_device_type_id.get() & 0xFFFF;
+	g_cfg_logitech_g27.m_mutex.unlock();
+
 
 	SDL_Joystick *new_led_joystick_handle = nullptr;
 	SDL_Haptic *new_haptic_handle = nullptr;
@@ -290,10 +296,6 @@ void usb_device_logitech_g27::sdl_refresh()
 	{
 		SDL_CloseHaptic(new_haptic_handle);
 	}
-
-	mapping = g_cfg_logitech_g27.to_runtime_mapping();
-
-	reverse_effects = g_cfg_logitech_g27.reverse_effects.get();
 }
 
 static inline int16_t logitech_g27_force_to_level(uint8_t force)
