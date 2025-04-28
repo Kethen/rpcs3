@@ -24,6 +24,9 @@ private:
 
 	void *state_text;
 
+	void *enabled;
+	void *reverse_effects;
+
 	void *steering;
 	void *throttle;
 	void *brake;

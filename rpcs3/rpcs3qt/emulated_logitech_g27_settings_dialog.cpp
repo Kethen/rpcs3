@@ -11,20 +11,34 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QCheckBox>
-#include <QTextEdit>
 #include <QLabel>
+#include <QScrollArea>
 
 #include <thread>
 #include <chrono>
 
-class DeviceChoice : public QTextEdit
+class DeviceChoice : public QWidget
 {
 
 public:
-	DeviceChoice(QWidget *parent, uint32_t device_type_id)
-		: QTextEdit(parent)
+	DeviceChoice(QWidget *parent, uint32_t device_type_id, const char *name)
+		: QWidget(parent)
 	{
 		this->device_type_id = device_type_id;
+
+		auto layout = new QHBoxLayout(this);
+
+		QLabel *label = new QLabel(this);
+		label->setText(QString(name));
+		layout->addWidget(label);
+
+		display_box = new QLabel(this);
+		display_box->setTextFormat(Qt::RichText);
+		display_box->setWordWrap(true);
+		display_box->setFrameStyle(QFrame::Box);
+		display_box->setMinimumWidth(100);
+		layout->addWidget(display_box);
+
 		update_display();
 	}
 
@@ -36,16 +50,16 @@ public:
 	void set_device_type_id(uint32_t device_type_id)
 	{
 		this->device_type_id = device_type_id;
-		setReadOnly(true);
 		update_display();
 	}
 
 private:
 	uint32_t device_type_id;
+	QLabel *display_box;
 	void update_display(){
 		char text_buf[32];
 		sprintf(text_buf, "%04x:%04x", device_type_id >> 16, device_type_id & 0xFFFF);
-		setText(QString(text_buf));
+		display_box->setText(QString(text_buf));
 	}
 };
 
@@ -53,25 +67,28 @@ class Mapping : public QGroupBox
 {
 
 public:
-	Mapping(emulated_logitech_g27_settings_dialog *parent, DeviceChoice *ffb_device, DeviceChoice *led_device, sdl_mapping mapping, bool is_axis, const char *name)
+	Mapping(QWidget *parent, emulated_logitech_g27_settings_dialog *dialog, DeviceChoice *ffb_device, DeviceChoice *led_device, sdl_mapping mapping, bool is_axis, const char *name)
 		: QGroupBox(parent)
 	{
-		auto layout = new QHBoxLayout(this);
-
-		setLayout(layout);
-
-		this->setting_dialog = parent;
+		this->setting_dialog = dialog;
 		this->ffb_device = ffb_device;
 		this->led_device = led_device;
 		this->mapping = mapping;
 		this->is_axis = is_axis;
 		this->name = std::string(name);
 
+		auto layout = new QHBoxLayout(this);
+
+		setLayout(layout);
+
 		QLabel *label = new QLabel(this);
 		label->setText(QString(name));
 
-		display_box = new QTextEdit(this);
-		display_box->setReadOnly(true);
+		display_box = new QLabel(this);
+		display_box->setTextFormat(Qt::RichText);
+		display_box->setWordWrap(true);
+		display_box->setFrameStyle(QFrame::Box);
+		display_box->setMinimumWidth(200);
 
 		ffb_set_button = new QPushButton(QString("FFB"), this);
 		led_set_button = new QPushButton(QString("LED"), this);
@@ -116,6 +133,7 @@ public:
 
 				timeout--;
 			}
+			this->setting_dialog->set_state_text("");
 			this->setting_dialog->enable();
 		});
 
@@ -158,7 +176,7 @@ private:
 
 	DeviceChoice *ffb_device;
 	DeviceChoice *led_device;
-	QTextEdit *display_box;
+	QLabel *display_box;
 	QPushButton *ffb_set_button;
 	QPushButton *led_set_button;
 	QPushButton *map_button;
@@ -181,7 +199,26 @@ private:
 				type_string = "axis";
 				break;
 		}
-		sprintf(text_buf, "%04x:%04x, %s %u", mapping.device_type_id >> 16, mapping.device_type_id & 0xFFFF, type_string, mapping.id);
+		const char *hat_string = nullptr;
+		switch(mapping.hat)
+		{
+			case HAT_UP:
+				hat_string = "up";
+				break;
+			case HAT_DOWN:
+				hat_string = "down";
+				break;
+			case HAT_LEFT:
+				hat_string = "left";
+				break;
+			case HAT_RIGHT:
+				hat_string = "right";
+				break;
+			case HAT_NONE:
+				hat_string = "";
+				break;
+		}
+		sprintf(text_buf, "%04x:%04x, %s %u %s", mapping.device_type_id >> 16, mapping.device_type_id & 0xFFFF, type_string, mapping.id, hat_string);
 		display_box->setText(QString(text_buf));
 
 		reverse_checkbox->setChecked(mapping.reverse);
@@ -223,7 +260,7 @@ emulated_logitech_g27_settings_dialog::emulated_logitech_g27_settings_dialog(QWi
 		}
 		else if (button == buttons->button(QDialogButtonBox::RestoreDefaults))
 		{
-			if (QMessageBox::question(this, tr("Confirm Reset"), tr("Reset all buttons?")) != QMessageBox::Yes)
+			if (QMessageBox::question(this, tr("Confirm Reset"), tr("Reset all?")) != QMessageBox::Yes)
 				return;
 			g_cfg_logitech_g27.fill_defaults();
 			// TODO reload UI states from config
@@ -234,11 +271,31 @@ emulated_logitech_g27_settings_dialog::emulated_logitech_g27_settings_dialog(QWi
 		}
 	});
 
+	enabled = reinterpret_cast<void *>(new QCheckBox(QString("Enabled (requires game restart)"), this));
+	reinterpret_cast<QCheckBox *>(enabled)->setChecked(g_cfg_logitech_g27.enabled.get());
+	v_layout->addWidget(reinterpret_cast<QCheckBox *>(enabled));
+
+	reverse_effects = reinterpret_cast<void *>(new QCheckBox(QString("Reverse force feedback effects"), this));
+	reinterpret_cast<QCheckBox *>(reverse_effects)->setChecked(g_cfg_logitech_g27.enabled.get());
+	v_layout->addWidget(reinterpret_cast<QCheckBox *>(reverse_effects));
+
 	state_text = reinterpret_cast<void *>(new QLabel(this));
 	v_layout->addWidget(reinterpret_cast<Mapping *>(state_text));
 
-	ffb_device = reinterpret_cast<void *>(new DeviceChoice(this, g_cfg_logitech_g27.ffb_device_type_id.get()));
-	led_device = reinterpret_cast<void *>(new DeviceChoice(this, g_cfg_logitech_g27.led_device_type_id.get()));
+	ffb_device = reinterpret_cast<void *>(new DeviceChoice(this, g_cfg_logitech_g27.ffb_device_type_id.get(), "Force Feedback Device"));
+	led_device = reinterpret_cast<void *>(new DeviceChoice(this, g_cfg_logitech_g27.led_device_type_id.get(), "LED Device"));
+
+	QScrollArea *mapping_scroll_area = new QScrollArea(this);
+	QWidget *mapping_widget = new QWidget(mapping_scroll_area);
+	QVBoxLayout* mapping_layout = new QVBoxLayout(mapping_widget);
+	mapping_widget->setLayout(mapping_layout);
+	mapping_scroll_area->setWidget(mapping_widget);
+	mapping_scroll_area->setWidgetResizable(true);
+	mapping_scroll_area->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	mapping_scroll_area->setMinimumHeight(400);
+	mapping_scroll_area->setMinimumWidth(650);
+
+	v_layout->addWidget(mapping_scroll_area);
 
 	#define ADD_MAPPING_SETTING(name, is_axis, display_name) \
 	{ \
@@ -250,14 +307,21 @@ emulated_logitech_g27_settings_dialog::emulated_logitech_g27_settings_dialog(QWi
 			.reverse = g_cfg_logitech_g27.name##_reverse.get(), \
 			.positive_axis = false \
 		}; \
-		name = reinterpret_cast<void *>(new Mapping(this, reinterpret_cast<DeviceChoice*>(ffb_device), reinterpret_cast<DeviceChoice*>(led_device), m, is_axis, display_name)); \
-		v_layout->addWidget(reinterpret_cast<Mapping *>(name)); \
+		name = reinterpret_cast<void *>(new Mapping(mapping_widget, this, reinterpret_cast<DeviceChoice*>(ffb_device), reinterpret_cast<DeviceChoice*>(led_device), m, is_axis, display_name)); \
+		mapping_layout->addWidget(reinterpret_cast<Mapping *>(name)); \
 	}
+
+	QLabel *axis_label = new QLabel(QString("Axes:"), mapping_widget);
+	mapping_layout->addWidget(axis_label);
 
 	ADD_MAPPING_SETTING(steering, true, "Steering");
 	ADD_MAPPING_SETTING(throttle, true, "Throttle");
 	ADD_MAPPING_SETTING(brake, true, "Brake");
 	ADD_MAPPING_SETTING(clutch, true, "Clutch");
+
+	QLabel *button_label = new QLabel(QString("Buttons:"), mapping_widget);
+	mapping_layout->addWidget(button_label);
+
 	ADD_MAPPING_SETTING(shift_up, false, "Shift up");
 	ADD_MAPPING_SETTING(shift_down, false, "Shift down");
 
@@ -291,7 +355,7 @@ emulated_logitech_g27_settings_dialog::emulated_logitech_g27_settings_dialog(QWi
 	ADD_MAPPING_SETTING(shifter_4, false, "Gear 4");
 	ADD_MAPPING_SETTING(shifter_5, false, "Gear 5");
 	ADD_MAPPING_SETTING(shifter_6, false, "Gear 6");
-	ADD_MAPPING_SETTING(shifter_r, false, "Gear r");
+	ADD_MAPPING_SETTING(shifter_r, false, "Gear R");
 
 	#undef ADD_MAPPING_SETTING
 

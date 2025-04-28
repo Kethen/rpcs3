@@ -84,6 +84,10 @@ usb_device_logitech_g27::usb_device_logitech_g27(u32 controller_index, const std
 
 	g_cfg_logitech_g27.load();
 
+	enabled = g_cfg_logitech_g27.enabled.get();
+	if (!enabled)
+		return;
+
 	sprintf(thread_name, "LogiG27 %p", this);
 	thread = SDL_CreateThread(refresh_thread, thread_name, this);
 	if (thread == nullptr)
@@ -91,10 +95,15 @@ usb_device_logitech_g27::usb_device_logitech_g27(u32 controller_index, const std
 		logitech_g27_log.error("Failed creating sdl housekeeping thread, %s", SDL_GetError());
 	}
 
+	// TODO refactor global sdl instance
 	// force global sdl init
 	pad::g_pad_mutex.lock();
 	pad_handler.Init();
 	pad::g_pad_mutex.unlock();
+}
+
+bool usb_device_logitech_g27::open_device(){
+	return enabled;
 }
 
 static void clear_sdl_joysticks(std::map<uint32_t, std::vector<SDL_Joystick *>> &joysticks)
@@ -126,7 +135,8 @@ usb_device_logitech_g27::~usb_device_logitech_g27()
 	sdl_handles_mutex.unlock();
 
 	// wait for the background thread to finish
-	SDL_WaitThread(thread, nullptr);
+	if (thread != nullptr)
+		SDL_WaitThread(thread, nullptr);
 }
 
 std::shared_ptr<usb_device> usb_device_logitech_g27::make_instance(u32 controller_index, const std::array<u8, 7>& location)

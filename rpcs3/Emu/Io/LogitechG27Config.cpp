@@ -143,6 +143,8 @@ void emulated_logitech_g27_config::fill_defaults(){
 	reverse_effects.set(true);
 	ffb_device_type_id.set(0x046dc24f);
 	led_device_type_id.set(0x046dc24f);
+
+	enabled.set(false);
 }
 
 void emulated_logitech_g27_config::save(){

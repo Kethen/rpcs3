@@ -105,11 +105,12 @@ public:
 
 	void control_transfer(u8 bmRequestType, u8 bRequest, u16 wValue, u16 wIndex, u16 wLength, u32 buf_size, u8* buf, UsbTransfer* transfer) override;
 	void interrupt_transfer(u32 buf_size, u8* buf, u32 endpoint, UsbTransfer* transfer) override;
+	bool open_device() override;
 
 	std::mutex thread_control_mutex;
 	bool stop_thread;
 	char thread_name[64];
-	SDL_Thread *thread;
+	SDL_Thread *thread = nullptr;
 	void sdl_refresh();
 private:
 	u32 m_controller_index;
@@ -129,6 +130,8 @@ private:
 
 	// just to initialize the global sdl instance
 	sdl_pad_handler pad_handler;
+
+	bool enabled;
 };
 
 struct emulated_logitech_g27_config : cfg::node {
@@ -191,6 +194,8 @@ struct emulated_logitech_g27_config : cfg::node {
 	cfg::_bool reverse_effects{this, "reverse_effects"};
 	cfg::uint<0, 0xFFFFFFFF> ffb_device_type_id{this, "ffb_device_type_id"};
 	cfg::uint<0, 0xFFFFFFFF> led_device_type_id{this, "led_device_type_id"};
+
+	cfg::_bool enabled{this, "enabled"};
 };
 
 extern emulated_logitech_g27_config g_cfg_logitech_g27;
