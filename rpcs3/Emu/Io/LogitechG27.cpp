@@ -18,6 +18,7 @@
 #include "Emu/Cell/lv2/sys_usbd.h"
 #include "Emu/system_config.h"
 #include "Input/pad_thread.h"
+#include "Input/sdl_instance.h"
 
 LOG_CHANNEL(logitech_g27_log, "LOGIG27");
 
@@ -84,7 +85,10 @@ usb_device_logitech_g27::usb_device_logitech_g27(u32 controller_index, const std
 
 	g_cfg_logitech_g27.load();
 
-	enabled = g_cfg_logitech_g27.enabled.get();
+	bool sdl_init_state = sdl_instance::get_instance().initialize();
+
+	enabled = g_cfg_logitech_g27.enabled.get() && sdl_init_state;
+
 	if (!enabled)
 		return;
 
@@ -94,12 +98,6 @@ usb_device_logitech_g27::usb_device_logitech_g27(u32 controller_index, const std
 	{
 		logitech_g27_log.error("Failed creating sdl housekeeping thread, %s", SDL_GetError());
 	}
-
-	// TODO refactor global sdl instance
-	// force global sdl init
-	pad::g_pad_mutex.lock();
-	pad_handler.Init();
-	pad::g_pad_mutex.unlock();
 }
 
 bool usb_device_logitech_g27::open_device(){
@@ -213,7 +211,6 @@ void usb_device_logitech_g27::sdl_refresh()
 	SDL_Haptic *new_haptic_handle = nullptr;
 	std::map<uint32_t, std::vector<SDL_Joystick *>> new_joysticks;
 
-	// SDL_LockJoysticks();
 	int joystick_count;
 	SDL_JoystickID *joystick_ids = SDL_GetJoysticks(&joystick_count);
 	if (joystick_ids != nullptr)
@@ -263,7 +260,7 @@ void usb_device_logitech_g27::sdl_refresh()
 	{
 		logitech_g27_log.error("Failed fetching joystick list, %s", SDL_GetError());
 	}
-	// SDL_UnlockJoysticks();
+	SDL_free(joystick_ids);
 
 	bool joysticks_changed = !sdl_joysticks_equal(joysticks, new_joysticks);
 	bool haptic_changed = haptic_handle != new_haptic_handle;
@@ -643,10 +640,7 @@ void usb_device_logitech_g27::interrupt_transfer(u32 buf_size, u8* buf, u32 endp
 
 		transfer->expected_count = 11;
 
-		// pump sdl events
-		pad::g_pad_mutex.lock();
-		SDL_PumpEvents();
-		pad::g_pad_mutex.unlock();
+		sdl_instance::get_instance().pump_events();
 
 		// Fetch input states from SDL
 		sdl_handles_mutex.lock();

@@ -128,9 +128,6 @@ private:
 	SDL_HapticEffect default_spring_effect = {0};
 	int default_spring_effect_id = -1;
 
-	// just to initialize the global sdl instance
-	sdl_pad_handler pad_handler;
-
 	bool enabled;
 };
 

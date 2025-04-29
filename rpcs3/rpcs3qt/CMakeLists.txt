@@ -159,6 +159,7 @@ add_library(rpcs3_ui STATIC
     ../Input/raw_mouse_config.cpp
     ../Input/raw_mouse_handler.cpp
     ../Input/sdl_pad_handler.cpp
+    ../Input/sdl_instance.cpp
     ../Input/skateboard_pad_handler.cpp
     ../Input/xinput_pad_handler.cpp
 
