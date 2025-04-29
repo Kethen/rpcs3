@@ -15,7 +15,12 @@
 #include <QCheckBox>
 #include <QLabel>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QTimer>
+
+LOG_CHANNEL(logitech_g27_log, "LOGIG27");
+
+#define DEFAULT_STATUS " "
 
 class DeviceChoice : public QWidget
 {
@@ -142,7 +147,7 @@ public:
 
 		connect(map_button, &QPushButton::clicked, this, [this](){
 			this->mapping_in_progress = true;
-			this->timeout_msec = 5000;
+			this->timeout_msec = 5500;
 			this->setting_dialog->disable();
 			this->last_joystick_states = this->setting_dialog->get_joystick_states();
 		});
@@ -162,20 +167,91 @@ public:
 
 				const std::map<uint32_t, joystick_state> &new_joystick_states = this->setting_dialog->get_joystick_states();
 
-				sprintf(text_buf, "Input %s for %s, timeout in %d %s\n", this->is_axis ? "axis" : "button/hat", this->name.c_str(), timeout_sec, timeout_sec >= 2 ? "seconds" : "second");
+				sprintf(text_buf, "Input %s for %s, timeout in %d %s", this->is_axis ? "axis" : "button/hat", this->name.c_str(), timeout_sec, timeout_sec >= 2 ? "seconds" : "second");
 				this->setting_dialog->set_state_text(text_buf);
-				// TODO pump SDL state and sample current input state
 
+				for (auto new_joystick_state = new_joystick_states.begin();new_joystick_state != new_joystick_states.end();new_joystick_state++)
+				{
+					auto last_joystick_state = this->last_joystick_states.find(new_joystick_state->first);
+					if (last_joystick_state == this->last_joystick_states.end())
+					{
+						continue;
+					}
+
+					if (this->is_axis)
+					{
+						const static int16_t axis_change_threshold = 0x7FFF / 5;
+						if (last_joystick_state->second.axes.size() != new_joystick_state->second.axes.size())
+						{
+							logitech_g27_log.error("during input state change diff, number of axes on %04x:%04x changed", new_joystick_state->first >> 16, new_joystick_state->first & 0xFFFF);
+							continue;
+						}
+						for (std::vector<int16_t>::size_type i = 0;i < new_joystick_state->second.axes.size();i++)
+						{
+							int32_t diff = std::abs(last_joystick_state->second.axes[i] - new_joystick_state->second.axes[i]);
+							if (diff > axis_change_threshold)
+							{
+								this->mapping_in_progress = false;
+								this->setting_dialog->set_state_text(DEFAULT_STATUS);
+								this->setting_dialog->enable();
+								this->mapping.device_type_id = new_joystick_state->first;
+								this->mapping.type = MAPPING_AXIS;
+								this->mapping.id = i;
+								this->mapping.hat = HAT_NONE;
+								break;
+							}
+						}
+					}
+					else
+					{
+						if (last_joystick_state->second.buttons.size() != new_joystick_state->second.buttons.size())
+						{
+							logitech_g27_log.error("during input state change diff, number of buttons on %04x:%04x changed", new_joystick_state->first >> 16, new_joystick_state->first & 0xFFFF);
+							continue;
+						}
+						if (last_joystick_state->second.hats.size() != new_joystick_state->second.hats.size())
+						{
+							logitech_g27_log.error("during input state change diff, number of hats on %04x:%04x changed", new_joystick_state->first >> 16, new_joystick_state->first & 0xFFFF);
+							continue;
+						}
+						for (std::vector<int16_t>::size_type i = 0;i < new_joystick_state->second.buttons.size();i++)
+						{
+							if (last_joystick_state->second.buttons[i] != new_joystick_state->second.buttons[i])
+							{
+								this->mapping_in_progress = false;
+								this->setting_dialog->set_state_text(DEFAULT_STATUS);
+								this->setting_dialog->enable();
+								this->mapping.device_type_id = new_joystick_state->first;
+								this->mapping.type = MAPPING_BUTTON;
+								this->mapping.id = i;
+								this->mapping.hat = HAT_NONE;
+								break;
+							}
+						}
+						for (std::vector<int16_t>::size_type i = 0;i < new_joystick_state->second.hats.size();i++)
+						{
+							if (last_joystick_state->second.hats[i] != new_joystick_state->second.hats[i] && new_joystick_state->second.hats[i] != HAT_NONE)
+							{
+								this->mapping_in_progress = false;
+								this->setting_dialog->set_state_text(DEFAULT_STATUS);
+								this->setting_dialog->enable();
+								this->mapping.device_type_id = new_joystick_state->first;
+								this->mapping.type = MAPPING_HAT;
+								this->mapping.id = i;
+								this->mapping.hat = new_joystick_state->second.hats[i];
+								break;
+							}
+						}
+					}
+				}
 
 				this->timeout_msec = this->timeout_msec - 25;
 				if (this->timeout_msec <= 0)
 				{
 					this->mapping_in_progress = false;
-					this->setting_dialog->set_state_text("");
+					this->setting_dialog->set_state_text(DEFAULT_STATUS);
 					this->setting_dialog->enable();
 				}
-
-				last_joystick_states = new_joystick_states;
 			}
 
 			update_display();
@@ -371,23 +447,23 @@ emulated_logitech_g27_settings_dialog::emulated_logitech_g27_settings_dialog(QWi
 	reinterpret_cast<QCheckBox *>(reverse_effects)->setChecked(g_cfg_logitech_g27.enabled.get());
 	v_layout->addWidget(reinterpret_cast<QCheckBox *>(reverse_effects));
 
-	state_text = reinterpret_cast<void *>(new QLabel(this));
+	state_text = reinterpret_cast<void *>(new QLabel(QString(DEFAULT_STATUS), this));
 	v_layout->addWidget(reinterpret_cast<Mapping *>(state_text));
 
 	ffb_device = reinterpret_cast<void *>(new DeviceChoice(this, g_cfg_logitech_g27.ffb_device_type_id.get(), "Force Feedback Device"));
 	led_device = reinterpret_cast<void *>(new DeviceChoice(this, g_cfg_logitech_g27.led_device_type_id.get(), "LED Device"));
 
-	QScrollArea *mapping_scroll_area = new QScrollArea(this);
-	QWidget *mapping_widget = new QWidget(mapping_scroll_area);
+	mapping_scroll_area = reinterpret_cast<void *>(new QScrollArea(this));
+	QWidget *mapping_widget = new QWidget(reinterpret_cast<QScrollArea *>(mapping_scroll_area));
 	QVBoxLayout* mapping_layout = new QVBoxLayout(mapping_widget);
 	mapping_widget->setLayout(mapping_layout);
-	mapping_scroll_area->setWidget(mapping_widget);
-	mapping_scroll_area->setWidgetResizable(true);
-	mapping_scroll_area->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	mapping_scroll_area->setMinimumHeight(400);
-	mapping_scroll_area->setMinimumWidth(700);
+	reinterpret_cast<QScrollArea *>(mapping_scroll_area)->setWidget(mapping_widget);
+	reinterpret_cast<QScrollArea *>(mapping_scroll_area)->setWidgetResizable(true);
+	reinterpret_cast<QScrollArea *>(mapping_scroll_area)->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	reinterpret_cast<QScrollArea *>(mapping_scroll_area)->setMinimumHeight(400);
+	reinterpret_cast<QScrollArea *>(mapping_scroll_area)->setMinimumWidth(700);
 
-	v_layout->addWidget(mapping_scroll_area);
+	v_layout->addWidget(reinterpret_cast<QScrollArea *>(mapping_scroll_area));
 
 	#define ADD_MAPPING_SETTING(name, is_axis, display_name, flip_axis_display) \
 	{ \
@@ -595,6 +671,9 @@ void emulated_logitech_g27_settings_dialog::set_state_text(const char *text)
 
 void emulated_logitech_g27_settings_dialog::toggle_state(bool enable)
 {
+
+	int slider_position = reinterpret_cast<QScrollArea *>(mapping_scroll_area)->verticalScrollBar()->sliderPosition();
+
 	#define TOGGLE_STATE(name) \
 	{ \
 		auto m = reinterpret_cast<Mapping *>(name); \
@@ -646,6 +725,9 @@ void emulated_logitech_g27_settings_dialog::toggle_state(bool enable)
 
 	reinterpret_cast<QCheckBox *>(enabled)->setEnabled(enable);
 	reinterpret_cast<QCheckBox *>(reverse_effects)->setEnabled(enable);
+
+	reinterpret_cast<QScrollArea *>(mapping_scroll_area)->verticalScrollBar()->setEnabled(enable);
+	reinterpret_cast<QScrollArea *>(mapping_scroll_area)->verticalScrollBar()->setSliderPosition(slider_position);
 }
 
 void emulated_logitech_g27_settings_dialog::enable(){

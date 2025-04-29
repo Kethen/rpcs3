@@ -84,4 +84,6 @@ private:
 
 	void *ffb_device;
 	void *led_device;
+
+	void *mapping_scroll_area;
 };
