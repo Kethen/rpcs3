@@ -13,6 +13,7 @@
 #include <QCheckBox>
 #include <QLabel>
 #include <QScrollArea>
+#include <QTimer>
 
 #include <thread>
 #include <chrono>
@@ -67,7 +68,7 @@ class Mapping : public QGroupBox
 {
 
 public:
-	Mapping(QWidget *parent, emulated_logitech_g27_settings_dialog *dialog, DeviceChoice *ffb_device, DeviceChoice *led_device, sdl_mapping mapping, bool is_axis, const char *name)
+	Mapping(QWidget *parent, emulated_logitech_g27_settings_dialog *dialog, DeviceChoice *ffb_device, DeviceChoice *led_device, sdl_mapping mapping, bool is_axis, const char *name, bool flip_axis_display)
 		: QGroupBox(parent)
 	{
 		this->setting_dialog = dialog;
@@ -76,33 +77,60 @@ public:
 		this->mapping = mapping;
 		this->is_axis = is_axis;
 		this->name = std::string(name);
+		this->mapping_in_progress = false;
 
-		auto layout = new QHBoxLayout(this);
-
+		QVBoxLayout *layout = new QVBoxLayout(this);
 		setLayout(layout);
 
-		QLabel *label = new QLabel(this);
+		QWidget *horizontal_container = new QWidget(this);
+		QHBoxLayout *horizontal_layout = new QHBoxLayout(horizontal_container);
+		horizontal_container->setLayout(horizontal_layout);
+
+		layout->addWidget(horizontal_container);
+
+		QLabel *label = new QLabel(horizontal_container);
 		label->setText(QString(name));
 
-		display_box = new QLabel(this);
+		display_box = new QLabel(horizontal_container);
 		display_box->setTextFormat(Qt::RichText);
 		display_box->setWordWrap(true);
 		display_box->setFrameStyle(QFrame::Box);
-		display_box->setMinimumWidth(200);
+		display_box->setMinimumWidth(150);
 
-		ffb_set_button = new QPushButton(QString("FFB"), this);
-		led_set_button = new QPushButton(QString("LED"), this);
-		map_button = new QPushButton(QString("MAP"), this);
-		reverse_checkbox = new QCheckBox(QString("Reverse"), this);
+		ffb_set_button = new QPushButton(QString("FFB"), horizontal_container);
+		led_set_button = new QPushButton(QString("LED"), horizontal_container);
+		map_button = new QPushButton(QString("MAP"), horizontal_container);
+		reverse_checkbox = new QCheckBox(QString("Reverse"), horizontal_container);
+
+		if (!this->is_axis)
+		{
+			button_status = new QCheckBox(QString("Pressed"), horizontal_container);
+			button_status->setDisabled(true);
+		}
+		else
+		{
+			axis_status = new QSlider(Qt::Horizontal, this);
+			axis_status->setDisabled(true);
+			axis_status->setMinimum(-0x8000);
+			axis_status->setMaximum(0x7FFF);
+			if(flip_axis_display)
+				axis_status->setInvertedAppearance(true);
+			axis_status->setValue(-0x8000);
+		}
 
 		update_display();
 
-		layout->addWidget(label);
-		layout->addWidget(display_box);
-		layout->addWidget(ffb_set_button);
-		layout->addWidget(led_set_button);
-		layout->addWidget(map_button);
-		layout->addWidget(reverse_checkbox);
+		horizontal_layout->addWidget(label);
+		horizontal_layout->addWidget(display_box);
+		if (!this->is_axis)
+			horizontal_layout->addWidget(button_status);
+		horizontal_layout->addWidget(ffb_set_button);
+		horizontal_layout->addWidget(led_set_button);
+		horizontal_layout->addWidget(map_button);
+		horizontal_layout->addWidget(reverse_checkbox);
+
+		if (this->is_axis)
+			layout->addWidget(axis_status);
 
 		connect(ffb_set_button, &QPushButton::clicked, this, [this]()
 		{
@@ -115,31 +143,41 @@ public:
 		});
 
 		connect(map_button, &QPushButton::clicked, this, [this](){
+			this->mapping_in_progress = true;
+			this->timeout_msec = 5000;
 			this->setting_dialog->disable();
-			int timeout = 20;
-
-			while (timeout >= 0)
-			{
-				char text_buf[128];
-				int timeout_sec = 125 * timeout / 1000;
-				sprintf(text_buf, "Input %s for %s, timeout in %d %s\n", this->is_axis ? "axis" : "button/hat", this->name.c_str(), timeout_sec, timeout_sec >= 2 ? "seconds" : "second");
-				this->setting_dialog->set_state_text(text_buf);
-				// TODO pump SDL state and sample current input state
-
-				std::this_thread::sleep_for(std::chrono::milliseconds(125));
-				// TODO pump SDL state again and sample new input state, check for changes
-
-				update_display();
-
-				timeout--;
-			}
-			this->setting_dialog->set_state_text("");
-			this->setting_dialog->enable();
 		});
 
 		connect(reverse_checkbox, &QCheckBox::clicked, this, [this](){
 			this->mapping.reverse = this->reverse_checkbox->isChecked();
 		});
+
+		tick_timer = new QTimer(this);
+		connect(tick_timer, &QTimer::timeout, this, [this]()
+		{
+			if (this->mapping_in_progress)
+			{
+				char text_buf[128];
+
+				int timeout_sec = this->timeout_msec / 1000;
+
+				sprintf(text_buf, "Input %s for %s, timeout in %d %s\n", this->is_axis ? "axis" : "button/hat", this->name.c_str(), timeout_sec, timeout_sec >= 2 ? "seconds" : "second");
+				this->setting_dialog->set_state_text(text_buf);
+				// TODO pump SDL state and sample current input state
+
+				update_display();
+
+				this->timeout_msec = this->timeout_msec - 25;
+				if (this->timeout_msec <= 0)
+				{
+					this->mapping_in_progress = false;
+					this->setting_dialog->set_state_text("");
+					this->setting_dialog->enable();
+				}
+			}
+			update_display();
+		});
+		tick_timer->start(25);
 	}
 
 	void disable()
@@ -181,6 +219,13 @@ private:
 	QPushButton *led_set_button;
 	QPushButton *map_button;
 	QCheckBox *reverse_checkbox;
+
+	bool mapping_in_progress;
+	int timeout_msec = 5000;
+	QTimer *tick_timer;
+
+	QCheckBox *button_status;
+	QSlider *axis_status;
 
 	emulated_logitech_g27_settings_dialog *setting_dialog;
 
@@ -293,11 +338,11 @@ emulated_logitech_g27_settings_dialog::emulated_logitech_g27_settings_dialog(QWi
 	mapping_scroll_area->setWidgetResizable(true);
 	mapping_scroll_area->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	mapping_scroll_area->setMinimumHeight(400);
-	mapping_scroll_area->setMinimumWidth(650);
+	mapping_scroll_area->setMinimumWidth(700);
 
 	v_layout->addWidget(mapping_scroll_area);
 
-	#define ADD_MAPPING_SETTING(name, is_axis, display_name) \
+	#define ADD_MAPPING_SETTING(name, is_axis, display_name, flip_axis_display) \
 	{ \
 		sdl_mapping m = { \
 			.device_type_id = static_cast<uint32_t>(g_cfg_logitech_g27.name##_device_type_id.get()), \
@@ -307,55 +352,55 @@ emulated_logitech_g27_settings_dialog::emulated_logitech_g27_settings_dialog(QWi
 			.reverse = g_cfg_logitech_g27.name##_reverse.get(), \
 			.positive_axis = false \
 		}; \
-		name = reinterpret_cast<void *>(new Mapping(mapping_widget, this, reinterpret_cast<DeviceChoice*>(ffb_device), reinterpret_cast<DeviceChoice*>(led_device), m, is_axis, display_name)); \
+		name = reinterpret_cast<void *>(new Mapping(mapping_widget, this, reinterpret_cast<DeviceChoice*>(ffb_device), reinterpret_cast<DeviceChoice*>(led_device), m, is_axis, display_name, flip_axis_display)); \
 		mapping_layout->addWidget(reinterpret_cast<Mapping *>(name)); \
 	}
 
 	QLabel *axis_label = new QLabel(QString("Axes:"), mapping_widget);
 	mapping_layout->addWidget(axis_label);
 
-	ADD_MAPPING_SETTING(steering, true, "Steering");
-	ADD_MAPPING_SETTING(throttle, true, "Throttle");
-	ADD_MAPPING_SETTING(brake, true, "Brake");
-	ADD_MAPPING_SETTING(clutch, true, "Clutch");
+	ADD_MAPPING_SETTING(steering, true, "Steering", false);
+	ADD_MAPPING_SETTING(throttle, true, "Throttle", true);
+	ADD_MAPPING_SETTING(brake, true, "Brake", true);
+	ADD_MAPPING_SETTING(clutch, true, "Clutch", true);
 
 	QLabel *button_label = new QLabel(QString("Buttons:"), mapping_widget);
 	mapping_layout->addWidget(button_label);
 
-	ADD_MAPPING_SETTING(shift_up, false, "Shift up");
-	ADD_MAPPING_SETTING(shift_down, false, "Shift down");
+	ADD_MAPPING_SETTING(shift_up, false, "Shift up", false);
+	ADD_MAPPING_SETTING(shift_down, false, "Shift down", false);
 
-	ADD_MAPPING_SETTING(up, false, "Up");
-	ADD_MAPPING_SETTING(down, false, "Down");
-	ADD_MAPPING_SETTING(left, false, "Left");
-	ADD_MAPPING_SETTING(right, false, "Right");
+	ADD_MAPPING_SETTING(up, false, "Up", false);
+	ADD_MAPPING_SETTING(down, false, "Down", false);
+	ADD_MAPPING_SETTING(left, false, "Left", false);
+	ADD_MAPPING_SETTING(right, false, "Right", false);
 
-	ADD_MAPPING_SETTING(triangle, false, "Triangle");
-	ADD_MAPPING_SETTING(cross, false, "Cross");
-	ADD_MAPPING_SETTING(square, false, "Square");
-	ADD_MAPPING_SETTING(circle, false, "Circle");
+	ADD_MAPPING_SETTING(triangle, false, "Triangle", false);
+	ADD_MAPPING_SETTING(cross, false, "Cross", false);
+	ADD_MAPPING_SETTING(square, false, "Square", false);
+	ADD_MAPPING_SETTING(circle, false, "Circle", false);
 
-	ADD_MAPPING_SETTING(l2, false, "L2");
-	ADD_MAPPING_SETTING(l3, false, "L3");
-	ADD_MAPPING_SETTING(r2, false, "R2");
-	ADD_MAPPING_SETTING(r3, false, "R3");
+	ADD_MAPPING_SETTING(l2, false, "L2", false);
+	ADD_MAPPING_SETTING(l3, false, "L3", false);
+	ADD_MAPPING_SETTING(r2, false, "R2", false);
+	ADD_MAPPING_SETTING(r3, false, "R3", false);
 
-	ADD_MAPPING_SETTING(plus, false, "L4");
-	ADD_MAPPING_SETTING(minus, false, "L5");
+	ADD_MAPPING_SETTING(plus, false, "L4", false);
+	ADD_MAPPING_SETTING(minus, false, "L5", false);
 
-	ADD_MAPPING_SETTING(dial_clockwise, false, "R4");
-	ADD_MAPPING_SETTING(dial_anticlockwise, false, "R5");
+	ADD_MAPPING_SETTING(dial_clockwise, false, "R4", false);
+	ADD_MAPPING_SETTING(dial_anticlockwise, false, "R5", false);
 
-	ADD_MAPPING_SETTING(select, false, "Select");
-	ADD_MAPPING_SETTING(pause, false, "Start");
+	ADD_MAPPING_SETTING(select, false, "Select", false);
+	ADD_MAPPING_SETTING(pause, false, "Start", false);
 
-	ADD_MAPPING_SETTING(shifter_1, false, "Gear 1");
-	ADD_MAPPING_SETTING(shifter_2, false, "Gear 2");
-	ADD_MAPPING_SETTING(shifter_3, false, "Gear 3");
-	ADD_MAPPING_SETTING(shifter_4, false, "Gear 4");
-	ADD_MAPPING_SETTING(shifter_5, false, "Gear 5");
-	ADD_MAPPING_SETTING(shifter_6, false, "Gear 6");
-	ADD_MAPPING_SETTING(shifter_r, false, "Gear R");
+	ADD_MAPPING_SETTING(shifter_1, false, "Gear 1", false);
+	ADD_MAPPING_SETTING(shifter_2, false, "Gear 2", false);
+	ADD_MAPPING_SETTING(shifter_3, false, "Gear 3", false);
+	ADD_MAPPING_SETTING(shifter_4, false, "Gear 4", false);
+	ADD_MAPPING_SETTING(shifter_5, false, "Gear 5", false);
+	ADD_MAPPING_SETTING(shifter_6, false, "Gear 6", false);
+	ADD_MAPPING_SETTING(shifter_r, false, "Gear R", false);
 
 	#undef ADD_MAPPING_SETTING
 
@@ -421,6 +466,9 @@ void emulated_logitech_g27_settings_dialog::toggle_state(bool enable)
 	TOGGLE_STATE(shifter_r);
 
 	#undef TOGGLE_STATE
+
+	reinterpret_cast<QCheckBox *>(enabled)->setEnabled(enable);
+	reinterpret_cast<QCheckBox *>(reverse_effects)->setEnabled(enable);
 }
 
 void emulated_logitech_g27_settings_dialog::enable(){
