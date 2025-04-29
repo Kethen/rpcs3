@@ -77,6 +77,7 @@ public:
 		this->is_axis = is_axis;
 		this->name = std::string(name);
 		this->mapping_in_progress = false;
+		this->flip_axis_display = flip_axis_display;
 
 		QVBoxLayout *layout = new QVBoxLayout(this);
 		setLayout(layout);
@@ -112,8 +113,6 @@ public:
 			axis_status->setDisabled(true);
 			axis_status->setMinimum(-0x8000);
 			axis_status->setMaximum(0x7FFF);
-			if(flip_axis_display)
-				axis_status->setInvertedAppearance(true);
 			axis_status->setValue(-0x8000);
 		}
 
@@ -231,6 +230,7 @@ private:
 
 	QCheckBox *button_status;
 	QSlider *axis_status;
+	bool flip_axis_display;
 
 	emulated_logitech_g27_settings_dialog *setting_dialog;
 
@@ -305,6 +305,8 @@ private:
 						break;
 					int32_t value = joystick_state->second.axes[mapping.id];
 					if (mapping.reverse)
+						value = value * (-1);
+					if (flip_axis_display)
 						value = value * (-1);
 					if (value > 0x7FFF)
 						value = 0x7FFF;
