@@ -1,3 +1,5 @@
+#ifdef HAVE_SDL3
+
 #include "Utilities/File.h"
 #include "LogitechG27.h"
 
@@ -187,3 +189,5 @@ bool emulated_logitech_g27_config::load()
 
 	return result;
 }
+
+#endif

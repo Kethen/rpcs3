@@ -1,8 +1,10 @@
+#ifdef HAVE_SDL3
+
 #include "stdafx.h"
 
 #include "emulated_logitech_g27_settings_dialog.h"
 
-#include "Emu/Io/LogitechG27.h"
+#include "Input/sdl_instance.h"
 
 #include <QDialogButtonBox>
 #include <QGroupBox>
@@ -14,9 +16,6 @@
 #include <QLabel>
 #include <QScrollArea>
 #include <QTimer>
-
-#include <thread>
-#include <chrono>
 
 class DeviceChoice : public QWidget
 {
@@ -146,6 +145,7 @@ public:
 			this->mapping_in_progress = true;
 			this->timeout_msec = 5000;
 			this->setting_dialog->disable();
+			this->last_joystick_states = this->setting_dialog->get_joystick_states();
 		});
 
 		connect(reverse_checkbox, &QCheckBox::clicked, this, [this](){
@@ -161,11 +161,12 @@ public:
 
 				int timeout_sec = this->timeout_msec / 1000;
 
+				const std::map<uint32_t, joystick_state> &new_joystick_states = this->setting_dialog->get_joystick_states();
+
 				sprintf(text_buf, "Input %s for %s, timeout in %d %s\n", this->is_axis ? "axis" : "button/hat", this->name.c_str(), timeout_sec, timeout_sec >= 2 ? "seconds" : "second");
 				this->setting_dialog->set_state_text(text_buf);
 				// TODO pump SDL state and sample current input state
 
-				update_display();
 
 				this->timeout_msec = this->timeout_msec - 25;
 				if (this->timeout_msec <= 0)
@@ -174,7 +175,10 @@ public:
 					this->setting_dialog->set_state_text("");
 					this->setting_dialog->enable();
 				}
+
+				last_joystick_states = new_joystick_states;
 			}
+
 			update_display();
 		});
 		tick_timer->start(25);
@@ -223,6 +227,7 @@ private:
 	bool mapping_in_progress;
 	int timeout_msec = 5000;
 	QTimer *tick_timer;
+	std::map<uint32_t, joystick_state> last_joystick_states;
 
 	QCheckBox *button_status;
 	QSlider *axis_status;
@@ -267,6 +272,49 @@ private:
 		display_box->setText(QString(text_buf));
 
 		reverse_checkbox->setChecked(mapping.reverse);
+
+		const std::map<uint32_t, joystick_state> &joystick_states = setting_dialog->get_joystick_states();
+		auto joystick_state = joystick_states.find(mapping.device_type_id);
+		if (joystick_state != joystick_states.end())
+		{
+			switch(mapping.type)
+			{
+				case MAPPING_BUTTON:
+				{
+					if (joystick_state->second.buttons.size() <= mapping.id)
+						break;
+					bool value = joystick_state->second.buttons[mapping.id];
+					if (mapping.reverse)
+						value = !value;
+					button_status->setChecked(value);
+					break;
+				}
+				case MAPPING_HAT:
+				{
+					if (joystick_state->second.hats.size() <= mapping.id)
+						break;
+					bool value = joystick_state->second.hats[mapping.id] == mapping.hat;
+					if (mapping.reverse)
+						value = !value;
+					button_status->setChecked(value);
+					break;
+				}
+				case MAPPING_AXIS:
+				{
+					if (joystick_state->second.axes.size() <= mapping.id)
+						break;
+					int32_t value = joystick_state->second.axes[mapping.id];
+					if (mapping.reverse)
+						value = value * (-1);
+					if (value > 0x7FFF)
+						value = 0x7FFF;
+					else if (value < (-0x8000))
+						value = (-0x8000);
+					axis_status->setValue(value);
+					break;
+				}
+			}
+		}
 	}
 };
 
@@ -285,9 +333,6 @@ emulated_logitech_g27_settings_dialog::emulated_logitech_g27_settings_dialog(QWi
 	buttons->setStandardButtons(QDialogButtonBox::Apply | QDialogButtonBox::Cancel | QDialogButtonBox::Save | QDialogButtonBox::RestoreDefaults);
 
 	g_cfg_logitech_g27.load();
-
-	// TODO create UI elements
-	// TODO load UI states from config
 
 	connect(buttons, &QDialogButtonBox::clicked, this, [this, buttons](QAbstractButton* button)
 	{
@@ -409,6 +454,136 @@ emulated_logitech_g27_settings_dialog::emulated_logitech_g27_settings_dialog(QWi
 
 	v_layout->addWidget(buttons);
 	setLayout(v_layout);
+
+	sdl_initialized = sdl_instance::get_instance().initialize();
+
+	if (sdl_initialized)
+		get_joystick_states();
+}
+
+emulated_logitech_g27_settings_dialog::~emulated_logitech_g27_settings_dialog()
+{
+	for (auto joystick_handle = joystick_handles.begin();joystick_handle != joystick_handles.end();joystick_handle++)
+	{
+		SDL_CloseJoystick(*joystick_handle);
+	}
+}
+
+static inline hat_component get_sdl_hat_component(uint8_t sdl_hat)
+{
+	if (sdl_hat & SDL_HAT_UP)
+	{
+		return HAT_UP;
+	}
+
+	if (sdl_hat & SDL_HAT_DOWN)
+	{
+		return HAT_DOWN;
+	}
+
+	if (sdl_hat & SDL_HAT_LEFT)
+	{
+		return HAT_LEFT;
+	}
+
+	if (sdl_hat & SDL_HAT_RIGHT)
+	{
+		return HAT_RIGHT;
+	}
+
+	return HAT_NONE;
+}
+
+const std::map<uint32_t, joystick_state> &emulated_logitech_g27_settings_dialog::get_joystick_states()
+{
+	if (!sdl_initialized)
+	{
+		return last_joystick_states;
+	}
+
+	uint64_t now = SDL_GetTicks();
+
+	if (SDL_GetTicks() - last_joystick_states_update < 25)
+	{
+		return last_joystick_states;
+	}
+
+	last_joystick_states_update = now;
+
+	std::map<uint32_t, joystick_state> new_joystick_states;
+
+	sdl_instance::get_instance().pump_events();
+
+	int joystick_count;
+	SDL_JoystickID *joystick_ids = SDL_GetJoysticks(&joystick_count);
+
+	std::vector<SDL_Joystick *> new_joystick_handles;
+
+	if (joystick_ids != nullptr)
+	{
+		for (int i = 0;i < joystick_count;i++)
+		{
+			SDL_Joystick *cur_joystick = SDL_OpenJoystick(joystick_ids[i]);
+			if (cur_joystick == nullptr)
+			{
+				continue;
+			}
+			new_joystick_handles.push_back(cur_joystick);
+
+			uint32_t device_type_id = (SDL_GetJoystickVendor(cur_joystick) << 16) | SDL_GetJoystickProduct(cur_joystick);
+
+			auto cur_state = new_joystick_states.find(device_type_id);
+			if (cur_state == new_joystick_states.end())
+			{
+				joystick_state s;
+				int num_axes = SDL_GetNumJoystickAxes(cur_joystick);
+				int num_buttons = SDL_GetNumJoystickButtons(cur_joystick);
+				int num_hats = SDL_GetNumJoystickHats(cur_joystick);
+				for (int j = 0;j < num_axes;j++)
+				{
+					s.axes.push_back(SDL_GetJoystickAxis(cur_joystick, j));
+				}
+				for (int j = 0;j < num_buttons;j++)
+				{
+					s.buttons.push_back(SDL_GetJoystickButton(cur_joystick, j));
+				}
+				for (int j = 0;j < num_hats;j++)
+				{
+					uint8_t sdl_hat = SDL_GetJoystickHat(cur_joystick, j);
+					s.hats.push_back(get_sdl_hat_component(sdl_hat));
+				}
+				new_joystick_states[device_type_id] = s;
+			}
+			else
+			{
+				for (std::vector<int16_t>::size_type j = 0;j < cur_state->second.axes.size();j++)
+				{
+					cur_state->second.axes[j] = (cur_state->second.axes[j] + SDL_GetJoystickAxis(cur_joystick, j)) / 2;
+				}
+				for (std::vector<bool>::size_type j = 0;j < cur_state->second.buttons.size();j++)
+				{
+					cur_state->second.buttons[j] = cur_state->second.buttons[j] || SDL_GetJoystickButton(cur_joystick, j);
+				}
+				for (std::vector<hat_component>::size_type j = 0;j < cur_state->second.hats.size();j++)
+				{
+					if (cur_state->second.hats[j] != HAT_NONE)
+						continue;
+					uint8_t sdl_hat = SDL_GetJoystickHat(cur_joystick, j);
+					cur_state->second.hats[j] = get_sdl_hat_component(sdl_hat);
+				}
+			}
+		}
+	}
+
+	for (auto joystick_handle = joystick_handles.begin(); joystick_handle != joystick_handles.end();joystick_handle++)
+	{
+		SDL_CloseJoystick(*joystick_handle);
+	}
+
+	joystick_handles = new_joystick_handles;
+	last_joystick_states = new_joystick_states;
+
+	return last_joystick_states;
 }
 
 void emulated_logitech_g27_settings_dialog::set_state_text(const char *text)
@@ -478,3 +653,5 @@ void emulated_logitech_g27_settings_dialog::enable(){
 void emulated_logitech_g27_settings_dialog::disable(){
 	toggle_state(false);
 }
+
+#endif

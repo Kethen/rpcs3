@@ -5,7 +5,17 @@
 #include <QTabWidget>
 #include <QLabel>
 
+#include <map>
 #include <vector>
+#include <Emu/Io/LogitechG27.h>
+
+#include <SDL3/SDL.h>
+
+struct joystick_state {
+	std::vector<int16_t> axes;
+	std::vector<bool> buttons;
+	std::vector<hat_component> hats;
+};
 
 class emulated_logitech_g27_settings_dialog : public QDialog
 {
@@ -13,15 +23,21 @@ class emulated_logitech_g27_settings_dialog : public QDialog
 
 public:
 	emulated_logitech_g27_settings_dialog(QWidget* parent = nullptr);
+	~emulated_logitech_g27_settings_dialog();
 	void disable();
 	void enable();
 	void set_state_text(const char *);
+	const std::map<uint32_t, joystick_state> &get_joystick_states();
 
 private:
-	void load_config();
-	void save_config();
-	void reset_config();
+	void toggle_state(bool enable);
 
+	std::map<uint32_t, joystick_state> last_joystick_states;
+	std::vector<SDL_Joystick *> joystick_handles;
+	uint64_t last_joystick_states_update = 0;
+	bool sdl_initialized = false;
+
+	// ui elements
 	void *state_text;
 
 	void *enabled;
@@ -68,6 +84,4 @@ private:
 
 	void *ffb_device;
 	void *led_device;
-
-	void toggle_state(bool enable);
 };

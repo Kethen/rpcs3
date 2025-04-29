@@ -255,12 +255,12 @@ void usb_device_logitech_g27::sdl_refresh()
 				new_led_joystick_handle = cur_joystick;
 			}
 		}
+		SDL_free(joystick_ids);
 	}
 	else
 	{
 		logitech_g27_log.error("Failed fetching joystick list, %s", SDL_GetError());
 	}
-	SDL_free(joystick_ids);
 
 	bool joysticks_changed = !sdl_joysticks_equal(joysticks, new_joysticks);
 	bool haptic_changed = haptic_handle != new_haptic_handle;
@@ -540,13 +540,11 @@ static int16_t fetch_sdl_as_axis(SDL_Joystick *joystick, const sdl_mapping &mapp
 		{
 			int32_t axis_value = SDL_GetJoystickAxis(joystick, mapping.id);
 			if (mapping.reverse)
-			{
 				axis_value = axis_value * (-1);
-			}
 			if (axis_value > MAX)
-			{
 				axis_value = MAX;
-			}
+			if (axis_value < MIN)
+				axis_value = MIN;
 			return axis_value;
 		}
 	}
