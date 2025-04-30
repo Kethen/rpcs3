@@ -100,6 +100,7 @@
     <ClCompile Include="Emu\Io\TopShotFearmaster.cpp" />
     <ClCompile Include="Emu\Io\Turntable.cpp" />
     <ClCompile Include="Emu\Io\LogitechG27.cpp" />
+    <ClCompile Include="Emu\Io\LogitechG27Conf.cpp" />
     <ClCompile Include="Emu\Io\usio.cpp" />
     <ClCompile Include="Emu\Audio\AudioBackend.cpp" />
     <ClCompile Include="Emu\Io\interception.cpp" />
