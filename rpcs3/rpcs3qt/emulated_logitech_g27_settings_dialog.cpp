@@ -589,6 +589,10 @@ emulated_logitech_g27_settings_dialog::emulated_logitech_g27_settings_dialog(QWi
 		}
 	});
 
+	QLabel *warning = new QLabel(QString("Warning: Force feedback output were meant for Logitech G27, on stronger wheels please adjust force strength accordingly in your wheel software."), this);
+	warning->setStyleSheet("color: red;");
+	v_layout->addWidget(warning);
+
 	enabled = new QCheckBox(QString("Enabled (requires game restart)"), this);
 	enabled->setChecked(g_cfg_logitech_g27.enabled.get());
 	v_layout->addWidget(enabled);
