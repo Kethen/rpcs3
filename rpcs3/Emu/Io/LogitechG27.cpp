@@ -150,6 +150,9 @@ u16 usb_device_logitech_g27::get_num_emu_devices()
 void usb_device_logitech_g27::control_transfer(u8 bmRequestType, u8 bRequest, u16 wValue, u16 wIndex, u16 wLength, u32 buf_size, u8* buf, UsbTransfer* transfer)
 {
 	transfer->fake = true;
+	transfer->expected_count  = buf_size;
+	transfer->expected_result = HC_CC_NOERR;
+	transfer->expected_time = get_timestamp() + 100;
 
 	// Log these for now, might not need to implement anything
 	usb_device_emulated::control_transfer(bmRequestType, bRequest, wValue, wIndex, wLength, buf_size, buf, transfer);
@@ -629,7 +632,8 @@ void usb_device_logitech_g27::interrupt_transfer(u32 buf_size, u8* buf, u32 endp
 {
 	transfer->fake = true;
 	transfer->expected_result = HC_CC_NOERR;
-	transfer->expected_time = get_timestamp();
+	// G29 in G27 mode polls at 500 hz, let's try a delay of 1ms for now, for wheels that updates that fast
+	transfer->expected_time = get_timestamp() + 1000;
 
 	if (endpoint & (1 << 7))
 	{
@@ -760,6 +764,8 @@ void usb_device_logitech_g27::interrupt_transfer(u32 buf_size, u8* buf, u32 endp
 			free(hex_buf);
 			return;
 		}
+
+		transfer->expected_count = buf_size;
 
 		// logitech_g27_log.error("%02x %02x %02x %02x %02x %02x %02x", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6]);
 		// printf("%02x %02x %02x %02x %02x %02x %02x\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6]);
