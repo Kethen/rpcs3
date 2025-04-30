@@ -12,11 +12,9 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QVBoxLayout>
-#include <QCheckBox>
-#include <QLabel>
-#include <QScrollArea>
 #include <QScrollBar>
 #include <QTimer>
+#include <QSlider>
 
 LOG_CHANNEL(logitech_g27_log, "LOGIG27");
 
@@ -439,31 +437,31 @@ emulated_logitech_g27_settings_dialog::emulated_logitech_g27_settings_dialog(QWi
 		}
 	});
 
-	enabled = reinterpret_cast<void *>(new QCheckBox(QString("Enabled (requires game restart)"), this));
-	reinterpret_cast<QCheckBox *>(enabled)->setChecked(g_cfg_logitech_g27.enabled.get());
-	v_layout->addWidget(reinterpret_cast<QCheckBox *>(enabled));
+	enabled = new QCheckBox(QString("Enabled (requires game restart)"), this);
+	enabled->setChecked(g_cfg_logitech_g27.enabled.get());
+	v_layout->addWidget(enabled);
 
-	reverse_effects = reinterpret_cast<void *>(new QCheckBox(QString("Reverse force feedback effects"), this));
-	reinterpret_cast<QCheckBox *>(reverse_effects)->setChecked(g_cfg_logitech_g27.enabled.get());
-	v_layout->addWidget(reinterpret_cast<QCheckBox *>(reverse_effects));
+	reverse_effects = new QCheckBox(QString("Reverse force feedback effects"), this);
+	reverse_effects->setChecked(g_cfg_logitech_g27.reverse_effects.get());
+	v_layout->addWidget(reverse_effects);
 
-	state_text = reinterpret_cast<void *>(new QLabel(QString(DEFAULT_STATUS), this));
-	v_layout->addWidget(reinterpret_cast<Mapping *>(state_text));
+	state_text = new QLabel(QString(DEFAULT_STATUS), this);
+	v_layout->addWidget(state_text);
 
-	ffb_device = reinterpret_cast<void *>(new DeviceChoice(this, g_cfg_logitech_g27.ffb_device_type_id.get(), "Force Feedback Device"));
-	led_device = reinterpret_cast<void *>(new DeviceChoice(this, g_cfg_logitech_g27.led_device_type_id.get(), "LED Device"));
+	ffb_device = new DeviceChoice(this, g_cfg_logitech_g27.ffb_device_type_id.get(), "Force Feedback Device");
+	led_device = new DeviceChoice(this, g_cfg_logitech_g27.led_device_type_id.get(), "LED Device");
 
-	mapping_scroll_area = reinterpret_cast<void *>(new QScrollArea(this));
-	QWidget *mapping_widget = new QWidget(reinterpret_cast<QScrollArea *>(mapping_scroll_area));
+	mapping_scroll_area = new QScrollArea(this);
+	QWidget *mapping_widget = new QWidget(mapping_scroll_area);
 	QVBoxLayout* mapping_layout = new QVBoxLayout(mapping_widget);
 	mapping_widget->setLayout(mapping_layout);
-	reinterpret_cast<QScrollArea *>(mapping_scroll_area)->setWidget(mapping_widget);
-	reinterpret_cast<QScrollArea *>(mapping_scroll_area)->setWidgetResizable(true);
-	reinterpret_cast<QScrollArea *>(mapping_scroll_area)->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	reinterpret_cast<QScrollArea *>(mapping_scroll_area)->setMinimumHeight(400);
-	reinterpret_cast<QScrollArea *>(mapping_scroll_area)->setMinimumWidth(700);
+	mapping_scroll_area->setWidget(mapping_widget);
+	mapping_scroll_area->setWidgetResizable(true);
+	mapping_scroll_area->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	mapping_scroll_area->setMinimumHeight(400);
+	mapping_scroll_area->setMinimumWidth(700);
 
-	v_layout->addWidget(reinterpret_cast<QScrollArea *>(mapping_scroll_area));
+	v_layout->addWidget(mapping_scroll_area);
 
 	#define ADD_MAPPING_SETTING(name, is_axis, display_name, flip_axis_display) \
 	{ \
@@ -475,8 +473,8 @@ emulated_logitech_g27_settings_dialog::emulated_logitech_g27_settings_dialog(QWi
 			.reverse = g_cfg_logitech_g27.name##_reverse.get(), \
 			.positive_axis = false \
 		}; \
-		name = reinterpret_cast<void *>(new Mapping(mapping_widget, this, reinterpret_cast<DeviceChoice*>(ffb_device), reinterpret_cast<DeviceChoice*>(led_device), m, is_axis, display_name, flip_axis_display)); \
-		mapping_layout->addWidget(reinterpret_cast<Mapping *>(name)); \
+		name = new Mapping(mapping_widget, this, ffb_device, led_device, m, is_axis, display_name, flip_axis_display); \
+		mapping_layout->addWidget(name); \
 	}
 
 	QLabel *axis_label = new QLabel(QString("Axes:"), mapping_widget);
@@ -527,8 +525,8 @@ emulated_logitech_g27_settings_dialog::emulated_logitech_g27_settings_dialog(QWi
 
 	#undef ADD_MAPPING_SETTING
 
-	v_layout->addWidget(reinterpret_cast<DeviceChoice *>(ffb_device));
-	v_layout->addWidget(reinterpret_cast<DeviceChoice *>(led_device));
+	v_layout->addWidget(ffb_device);
+	v_layout->addWidget(led_device);
 
 	v_layout->addWidget(buttons);
 	setLayout(v_layout);
@@ -666,21 +664,20 @@ const std::map<uint32_t, joystick_state> &emulated_logitech_g27_settings_dialog:
 
 void emulated_logitech_g27_settings_dialog::set_state_text(const char *text)
 {
-	reinterpret_cast<QLabel *>(state_text)->setText(QString(text));
+	state_text->setText(QString(text));
 }
 
 void emulated_logitech_g27_settings_dialog::toggle_state(bool enable)
 {
 
-	int slider_position = reinterpret_cast<QScrollArea *>(mapping_scroll_area)->verticalScrollBar()->sliderPosition();
+	int slider_position = mapping_scroll_area->verticalScrollBar()->sliderPosition();
 
 	#define TOGGLE_STATE(name) \
 	{ \
-		auto m = reinterpret_cast<Mapping *>(name); \
 		if (enable) \
-			m->enable(); \
+			name->enable(); \
 		else \
-			m->disable(); \
+			name->disable(); \
 	}
 	TOGGLE_STATE(steering);
 	TOGGLE_STATE(throttle);
@@ -723,11 +720,11 @@ void emulated_logitech_g27_settings_dialog::toggle_state(bool enable)
 
 	#undef TOGGLE_STATE
 
-	reinterpret_cast<QCheckBox *>(enabled)->setEnabled(enable);
-	reinterpret_cast<QCheckBox *>(reverse_effects)->setEnabled(enable);
+	enabled->setEnabled(enable);
+	reverse_effects->setEnabled(enable);
 
-	reinterpret_cast<QScrollArea *>(mapping_scroll_area)->verticalScrollBar()->setEnabled(enable);
-	reinterpret_cast<QScrollArea *>(mapping_scroll_area)->verticalScrollBar()->setSliderPosition(slider_position);
+	mapping_scroll_area->verticalScrollBar()->setEnabled(enable);
+	mapping_scroll_area->verticalScrollBar()->setSliderPosition(slider_position);
 }
 
 void emulated_logitech_g27_settings_dialog::enable(){

@@ -1,9 +1,9 @@
 #pragma once
 
-#include <QComboBox>
 #include <QDialog>
-#include <QTabWidget>
 #include <QLabel>
+#include <QCheckBox>
+#include <QScrollArea>
 
 #include <map>
 #include <vector>
@@ -16,6 +16,9 @@ struct joystick_state {
 	std::vector<bool> buttons;
 	std::vector<hat_component> hats;
 };
+
+class Mapping;
+class DeviceChoice;
 
 class emulated_logitech_g27_settings_dialog : public QDialog
 {
@@ -38,52 +41,52 @@ private:
 	bool sdl_initialized = false;
 
 	// ui elements
-	void *state_text;
+	QLabel *state_text;
 
-	void *enabled;
-	void *reverse_effects;
+	QCheckBox *enabled;
+	QCheckBox *reverse_effects;
 
-	void *steering;
-	void *throttle;
-	void *brake;
-	void *clutch;
-	void *shift_up;
-	void *shift_down;
+	Mapping *steering;
+	Mapping *throttle;
+	Mapping *brake;
+	Mapping *clutch;
+	Mapping *shift_up;
+	Mapping *shift_down;
 
-	void *up;
-	void *down;
-	void *left;
-	void *right;
+	Mapping *up;
+	Mapping *down;
+	Mapping *left;
+	Mapping *right;
 
-	void *triangle;
-	void *cross;
-	void *square;
-	void *circle;
+	Mapping *triangle;
+	Mapping *cross;
+	Mapping *square;
+	Mapping *circle;
 
-	void *l2;
-	void *l3;
-	void *r2;
-	void *r3;
+	Mapping *l2;
+	Mapping *l3;
+	Mapping *r2;
+	Mapping *r3;
 
-	void *plus;
-	void *minus;
+	Mapping *plus;
+	Mapping *minus;
 
-	void *dial_clockwise;
-	void *dial_anticlockwise;
+	Mapping *dial_clockwise;
+	Mapping *dial_anticlockwise;
 
-	void *select;
-	void *pause;
+	Mapping *select;
+	Mapping *pause;
 
-	void *shifter_1;
-	void *shifter_2;
-	void *shifter_3;
-	void *shifter_4;
-	void *shifter_5;
-	void *shifter_6;
-	void *shifter_r;
+	Mapping *shifter_1;
+	Mapping *shifter_2;
+	Mapping *shifter_3;
+	Mapping *shifter_4;
+	Mapping *shifter_5;
+	Mapping *shifter_6;
+	Mapping *shifter_r;
 
-	void *ffb_device;
-	void *led_device;
+	DeviceChoice *ffb_device;
+	DeviceChoice *led_device;
 
-	void *mapping_scroll_area;
+	QScrollArea *mapping_scroll_area;
 };
