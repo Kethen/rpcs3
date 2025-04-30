@@ -103,6 +103,7 @@ public:
 		ffb_set_button = new QPushButton(QString("FFB"), horizontal_container);
 		led_set_button = new QPushButton(QString("LED"), horizontal_container);
 		map_button = new QPushButton(QString("MAP"), horizontal_container);
+		unmap_button = new QPushButton(QString("UNMAP"), horizontal_container);
 		reverse_checkbox = new QCheckBox(QString("Reverse"), horizontal_container);
 
 		if (!this->is_axis)
@@ -128,6 +129,7 @@ public:
 		horizontal_layout->addWidget(ffb_set_button);
 		horizontal_layout->addWidget(led_set_button);
 		horizontal_layout->addWidget(map_button);
+		horizontal_layout->addWidget(unmap_button);
 		horizontal_layout->addWidget(reverse_checkbox);
 
 		if (this->is_axis)
@@ -148,6 +150,11 @@ public:
 			this->timeout_msec = 5500;
 			this->setting_dialog->disable();
 			this->last_joystick_states = this->setting_dialog->get_joystick_states();
+		});
+
+		connect(unmap_button, &QPushButton::clicked, this, [this](){
+			this->mapping.device_type_id = 0;
+			update_display();
 		});
 
 		connect(reverse_checkbox, &QCheckBox::clicked, this, [this](){
@@ -295,6 +302,7 @@ private:
 	QPushButton *ffb_set_button;
 	QPushButton *led_set_button;
 	QPushButton *map_button;
+	QPushButton *unmap_button;
 	QCheckBox *reverse_checkbox;
 
 	bool mapping_in_progress;
@@ -459,7 +467,7 @@ emulated_logitech_g27_settings_dialog::emulated_logitech_g27_settings_dialog(QWi
 	mapping_scroll_area->setWidgetResizable(true);
 	mapping_scroll_area->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	mapping_scroll_area->setMinimumHeight(400);
-	mapping_scroll_area->setMinimumWidth(700);
+	mapping_scroll_area->setMinimumWidth(800);
 
 	v_layout->addWidget(mapping_scroll_area);
 
