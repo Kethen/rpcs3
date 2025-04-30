@@ -553,15 +553,18 @@ static int16_t fetch_sdl_as_axis(SDL_Joystick *joystick, const sdl_mapping &mapp
 
 static int16_t fetch_sdl_axis_avg(std::map<uint32_t, std::vector<SDL_Joystick *>> &joysticks, const sdl_mapping &mapping)
 {
+	const static int16_t MAX = 0x7FFF;
+	const static int16_t MIN = -0x8000;
+
 	auto joysticks_of_type = joysticks.find(mapping.device_type_id);
 	if (joysticks_of_type == joysticks.end())
 	{
-		return 0;
+		return mapping.reverse ? MAX : MIN;
 	}
 
 	if (joysticks_of_type->second.size() == 0)
 	{
-		return 0;
+		return mapping.reverse ? MAX : MIN;
 	}
 
 	// TODO account for deadzone and only pick up active devices

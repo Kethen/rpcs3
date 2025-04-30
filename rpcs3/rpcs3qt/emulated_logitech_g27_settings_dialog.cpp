@@ -108,11 +108,13 @@ public:
 
 		if (!this->is_axis)
 		{
+			axis_status = nullptr;
 			button_status = new QCheckBox(QString("Pressed"), horizontal_container);
 			button_status->setDisabled(true);
 		}
 		else
 		{
+			button_status = nullptr;
 			axis_status = new QSlider(Qt::Horizontal, this);
 			axis_status->setDisabled(true);
 			axis_status->setMinimum(-0x8000);
@@ -355,8 +357,26 @@ private:
 
 		reverse_checkbox->setChecked(mapping.reverse);
 
+		if (button_status)
+			button_status->setChecked(mapping.reverse);
+
+		if (axis_status)
+		{
+			int32_t axis_value = (-0x8000);
+			if (mapping.reverse)
+				axis_value = axis_value * (-1);
+			if (flip_axis_display)
+				axis_value = axis_value * (-1);
+			if (axis_value > 0x7FFF)
+				axis_value = 0x7FFF;
+			if (axis_value < (-0x8000))
+				axis_value = (-0x8000);
+			axis_status->setValue(axis_value);
+		}
+
 		const std::map<uint32_t, joystick_state> &joystick_states = setting_dialog->get_joystick_states();
 		auto joystick_state = joystick_states.find(mapping.device_type_id);
+
 		if (joystick_state != joystick_states.end())
 		{
 			switch(mapping.type)
