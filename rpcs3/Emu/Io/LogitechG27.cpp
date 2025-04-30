@@ -545,6 +545,8 @@ static int16_t fetch_sdl_as_axis(SDL_Joystick *joystick, const sdl_mapping &mapp
 				axis_value = MAX;
 			if (axis_value < MIN)
 				axis_value = MIN;
+			if (axis_value == (MIN + 1))
+				axis_value = MIN;
 			return axis_value;
 		}
 	}
