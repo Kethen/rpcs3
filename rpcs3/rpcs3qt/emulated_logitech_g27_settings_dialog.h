@@ -31,9 +31,10 @@ public:
 	void enable();
 	void set_state_text(const char *);
 	const std::map<uint32_t, joystick_state> &get_joystick_states();
-
 private:
 	void toggle_state(bool enable);
+	void load_ui_state_from_config();
+	void save_ui_state_to_config();
 
 	std::map<uint32_t, joystick_state> last_joystick_states;
 	std::vector<SDL_Joystick *> joystick_handles;

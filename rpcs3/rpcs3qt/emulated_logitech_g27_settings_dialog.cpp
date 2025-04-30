@@ -280,13 +280,13 @@ public:
 		reverse_checkbox->setEnabled(true);
 	}
 
-	void set_mapping(sdl_mapping mapping)
+	void set_mapping(const sdl_mapping &mapping)
 	{
 		this->mapping = mapping;
 		update_display();
 	}
 
-	sdl_mapping get_mapping()
+	const sdl_mapping &get_mapping()
 	{
 		return mapping;
 	}
@@ -402,6 +402,129 @@ private:
 	}
 };
 
+void emulated_logitech_g27_settings_dialog::save_ui_state_to_config()
+{
+	#define SAVE_MAPPING(name) \
+	{ \
+		const sdl_mapping &m = name->get_mapping(); \
+		g_cfg_logitech_g27.name##_device_type_id.set(m.device_type_id); \
+		g_cfg_logitech_g27.name##_type.set(m.type); \
+		g_cfg_logitech_g27.name##_id.set(m.id); \
+		g_cfg_logitech_g27.name##_hat.set(m.hat); \
+		g_cfg_logitech_g27.name##_reverse.set(m.reverse); \
+	}
+
+	SAVE_MAPPING(steering);
+	SAVE_MAPPING(throttle);
+	SAVE_MAPPING(brake);
+	SAVE_MAPPING(clutch);
+	SAVE_MAPPING(shift_up);
+	SAVE_MAPPING(shift_down);
+
+	SAVE_MAPPING(up);
+	SAVE_MAPPING(down);
+	SAVE_MAPPING(left);
+	SAVE_MAPPING(right);
+
+	SAVE_MAPPING(triangle);
+	SAVE_MAPPING(cross);
+	SAVE_MAPPING(square);
+	SAVE_MAPPING(circle);
+
+	SAVE_MAPPING(l2);
+	SAVE_MAPPING(l3);
+	SAVE_MAPPING(r2);
+	SAVE_MAPPING(r3);
+
+	SAVE_MAPPING(plus);
+	SAVE_MAPPING(minus);
+
+	SAVE_MAPPING(dial_clockwise);
+	SAVE_MAPPING(dial_anticlockwise);
+
+	SAVE_MAPPING(select);
+	SAVE_MAPPING(pause);
+
+	SAVE_MAPPING(shifter_1);
+	SAVE_MAPPING(shifter_2);
+	SAVE_MAPPING(shifter_3);
+	SAVE_MAPPING(shifter_4);
+	SAVE_MAPPING(shifter_5);
+	SAVE_MAPPING(shifter_6);
+	SAVE_MAPPING(shifter_r);
+
+	#undef SAVE_MAPPING
+
+	g_cfg_logitech_g27.ffb_device_type_id.set(ffb_device->get_device_type_id());
+	g_cfg_logitech_g27.led_device_type_id.set(led_device->get_device_type_id());
+
+	g_cfg_logitech_g27.enabled.set(enabled->isChecked());
+	g_cfg_logitech_g27.reverse_effects.set(reverse_effects->isChecked());
+}
+
+void emulated_logitech_g27_settings_dialog::load_ui_state_from_config()
+{
+	#define LOAD_MAPPING(name) \
+	{ \
+		sdl_mapping m = { \
+			.device_type_id = static_cast<uint32_t>(g_cfg_logitech_g27.name##_device_type_id.get()), \
+			.type = static_cast<sdl_mapping_type>(g_cfg_logitech_g27.name##_type.get()), \
+			.id = static_cast<uint8_t>(g_cfg_logitech_g27.name##_id.get()), \
+			.hat = static_cast<hat_component>(g_cfg_logitech_g27.name##_hat.get()), \
+			.reverse = g_cfg_logitech_g27.name##_reverse.get(), \
+			.positive_axis = false \
+		}; \
+		name->set_mapping(m); \
+	}
+
+	LOAD_MAPPING(steering);
+	LOAD_MAPPING(throttle);
+	LOAD_MAPPING(brake);
+	LOAD_MAPPING(clutch);
+	LOAD_MAPPING(shift_up);
+	LOAD_MAPPING(shift_down);
+
+	LOAD_MAPPING(up);
+	LOAD_MAPPING(down);
+	LOAD_MAPPING(left);
+	LOAD_MAPPING(right);
+
+	LOAD_MAPPING(triangle);
+	LOAD_MAPPING(cross);
+	LOAD_MAPPING(square);
+	LOAD_MAPPING(circle);
+
+	LOAD_MAPPING(l2);
+	LOAD_MAPPING(l3);
+	LOAD_MAPPING(r2);
+	LOAD_MAPPING(r3);
+
+	LOAD_MAPPING(plus);
+	LOAD_MAPPING(minus);
+
+	LOAD_MAPPING(dial_clockwise);
+	LOAD_MAPPING(dial_anticlockwise);
+
+	LOAD_MAPPING(select);
+	LOAD_MAPPING(pause);
+
+	LOAD_MAPPING(shifter_1);
+	LOAD_MAPPING(shifter_2);
+	LOAD_MAPPING(shifter_3);
+	LOAD_MAPPING(shifter_4);
+	LOAD_MAPPING(shifter_5);
+	LOAD_MAPPING(shifter_6);
+	LOAD_MAPPING(shifter_r);
+
+	#undef LOAD_MAPPING
+
+	ffb_device->set_device_type_id(static_cast<uint32_t>(g_cfg_logitech_g27.ffb_device_type_id.get()));
+	led_device->set_device_type_id(static_cast<uint32_t>(g_cfg_logitech_g27.led_device_type_id.get()));
+
+	enabled->setChecked(g_cfg_logitech_g27.enabled.get());
+	reverse_effects->setChecked(g_cfg_logitech_g27.reverse_effects.get());
+}
+
 emulated_logitech_g27_settings_dialog::emulated_logitech_g27_settings_dialog(QWidget* parent)
 	: QDialog(parent)
 {
@@ -422,13 +545,13 @@ emulated_logitech_g27_settings_dialog::emulated_logitech_g27_settings_dialog(QWi
 	{
 		if (button == buttons->button(QDialogButtonBox::Apply))
 		{
-			// TODO apply ui state to config
+			save_ui_state_to_config();
 			g_cfg_logitech_g27.save();
-			// TODO reload UI states from config
+			load_ui_state_from_config();
 		}
 		else if (button == buttons->button(QDialogButtonBox::Save))
 		{
-			// TODO apply ui state to config
+			save_ui_state_to_config();
 			g_cfg_logitech_g27.save();
 			accept();
 		}
@@ -437,7 +560,8 @@ emulated_logitech_g27_settings_dialog::emulated_logitech_g27_settings_dialog(QWi
 			if (QMessageBox::question(this, tr("Confirm Reset"), tr("Reset all?")) != QMessageBox::Yes)
 				return;
 			g_cfg_logitech_g27.fill_defaults();
-			// TODO reload UI states from config
+			load_ui_state_from_config();
+			g_cfg_logitech_g27.save();
 		}
 		else if (button == buttons->button(QDialogButtonBox::Cancel))
 		{
