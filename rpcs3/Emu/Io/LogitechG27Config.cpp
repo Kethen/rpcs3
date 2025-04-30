@@ -67,6 +67,7 @@ logitech_g27_sdl_mapping emulated_logitech_g27_config::to_runtime_mapping()
 
 void emulated_logitech_g27_config::fill_defaults(){
 	// a shifter-less g29 with a xbox 360 controller shifter place holder...
+	m_mutex.lock();
 
 	#define INIT_AXIS_MAPPING(name, device_type_id, id, reverse) \
 	{ \
@@ -147,9 +148,12 @@ void emulated_logitech_g27_config::fill_defaults(){
 	led_device_type_id.set(0x046dc24f);
 
 	enabled.set(false);
+
+	m_mutex.unlock();
 }
 
 void emulated_logitech_g27_config::save(){
+	m_mutex.lock();
 	const std::string cfg_name = fmt::format("%s%s.yml", fs::get_config_dir(true), "LogitechG27");
 	cfg_log.notice("Saving LogitechG27 config: %s", cfg_name);
 
@@ -162,31 +166,33 @@ void emulated_logitech_g27_config::save(){
 	{
 		cfg_log.error("Failed to save LogitechG27 config to '%s' (error=%s)", cfg_name, fs::g_tls_error);
 	}
+	m_mutex.unlock();
+
 }
 
 bool emulated_logitech_g27_config::load()
 {
-	m_mutex.lock();
 	bool result = false;
 	const std::string cfg_name = fmt::format("%s%s.yml", fs::get_config_dir(true), "LogitechG27");
 	cfg_log.notice("Loading LogitechG27 config: %s", cfg_name);
 
 	fill_defaults();
 
+	m_mutex.lock();
+
 	if (fs::file cfg_file{ cfg_name, fs::read })
 	{
 		if (const std::string content = cfg_file.to_string(); !content.empty())
 		{
-			m_mutex.unlock();
 			result = from_string(content);
 		}
 	}
 	else
 	{
-		m_mutex.unlock();
 		save();
 	}
 
+	m_mutex.unlock();
 	return result;
 }
 
