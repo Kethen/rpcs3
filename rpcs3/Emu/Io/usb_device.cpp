@@ -57,6 +57,7 @@ u64 usb_device::get_timestamp()
 usb_device_passthrough::usb_device_passthrough(libusb_device* _device, libusb_device_descriptor& desc, const std::array<u8, 7>& location)
 	: usb_device(location), lusb_device(_device)
 {
+	printf("passthrough device create bcdUSB %04x, bDeviceClass %02x, bDeviceSubClass %02x, bDeviceProtocol %02x, bMaxPacketSize0 %02x, idVendor %04x, idProduct %04x, bcdDevice %04x, iManufacturer %02x, iProduct %02x, iSerialNumber %02x, bNumConfigurations %02x\n", desc.bcdUSB, desc.bDeviceClass, desc.bDeviceSubClass, desc.bDeviceProtocol, desc.bMaxPacketSize0, desc.idVendor, desc.idProduct, desc.bcdDevice, desc.iManufacturer, desc.iProduct, desc.iSerialNumber, desc.bNumConfigurations);
 	device = UsbDescriptorNode(USB_DESCRIPTOR_DEVICE, UsbDeviceDescriptor{desc.bcdUSB, desc.bDeviceClass, desc.bDeviceSubClass, desc.bDeviceProtocol, desc.bMaxPacketSize0, desc.idVendor, desc.idProduct,
 														  desc.bcdDevice, desc.iManufacturer, desc.iProduct, desc.iSerialNumber, desc.bNumConfigurations});
 }
@@ -119,6 +120,15 @@ void usb_device_passthrough::read_descriptors()
 			continue;
 		}
 
+		char hex_buf[4096] = {0};
+		int offset = 0;
+		for (int i = 0;i < ssize;i++)
+		{
+			offset += sprintf(&hex_buf[offset], "%02x ", buf[i]);
+		}
+
+		printf("passthrough descriptor read: %s\n", hex_buf);
+
 		// Minimalistic parse
 		auto& conf = device.add_node(UsbDescriptorNode(buf[0], buf[1], &buf[2]));
 
@@ -132,13 +142,19 @@ void usb_device_passthrough::read_descriptors()
 
 u32 usb_device_passthrough::get_configuration(u8* buf)
 {
-	return (libusb_get_configuration(lusb_handle, reinterpret_cast<int*>(buf)) == LIBUSB_SUCCESS) ? sizeof(u8) : 0;
+	const int status = libusb_get_configuration(lusb_handle, reinterpret_cast<int*>(buf));
+	const bool success = status == LIBUSB_SUCCESS;
+	printf("passthrough get configuration: %d, %d\n", *reinterpret_cast<int*>(buf), status);
+	return success ? sizeof(u8) : 0;
 };
 
 bool usb_device_passthrough::set_configuration(u8 cfg_num)
 {
 	usb_device::set_configuration(cfg_num);
-	return (libusb_set_configuration(lusb_handle, cfg_num) == LIBUSB_SUCCESS);
+	const int status = libusb_set_configuration(lusb_handle, cfg_num);
+	const bool success = status == libusb_set_configuration(lusb_handle, cfg_num);
+	printf("passthrough set configuration: %d, %d\n", cfg_num, status);
+	return success;
 };
 
 bool usb_device_passthrough::set_interface(u8 int_num)
@@ -157,6 +173,17 @@ void usb_device_passthrough::control_transfer(u8 bmRequestType, u8 bRequest, u16
 	libusb_fill_control_setup(transfer->setup_buf.data(), bmRequestType, bRequest, wValue, wIndex, buf_size);
 	memcpy(transfer->setup_buf.data() + LIBUSB_CONTROL_SETUP_SIZE, buf, buf_size);
 	libusb_fill_control_transfer(transfer->transfer, lusb_handle, transfer->setup_buf.data(), callback_transfer, transfer, 0);
+
+	printf("passthrough control bmRequestType %02x, bRequest %02x, wValue %04x, wIndex %04x, wLength %04x\n", bmRequestType, bRequest, wValue, wIndex, wLength);
+	if (transfer->control_destbuf == nullptr && buf != nullptr)
+	{
+		sys_usbd.todo("passthrough control bmRequestType %02x, bRequest %02x, wValue %04x, wIndex %04x, wLength %04x, %s", bmRequestType, bRequest, wValue, wIndex, wLength, fmt::buf_to_hexstring(buf, buf_size));
+	}
+	else
+	{
+		sys_usbd.todo("passthrough control bmRequestType %02x, bRequest %02x, wValue %04x, wIndex %04x, wLength %04x", bmRequestType, bRequest, wValue, wIndex, wLength);
+	}
+
 	send_libusb_transfer(transfer->transfer);
 }
 

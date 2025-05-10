@@ -29,9 +29,11 @@ static const SDL_HapticDirection STEERING_DIRECTION =
 usb_device_logitech_g27::usb_device_logitech_g27(u32 controller_index, const std::array<u8, 7>& location)
 	: usb_device_emulated(location), m_controller_index(controller_index)
 {
+	// passthrough device create bcdUSB 0200, bDeviceClass 00, bDeviceSubClass 00, bDeviceProtocol 00, bMaxPacketSize0 10, idVendor 046d, idProduct c29b, bcdDevice 1350, iManufacturer 01, iProduct 02, iSerialNumber 00, bNumConfigurations 01
 	device = UsbDescriptorNode(USB_DESCRIPTOR_DEVICE, UsbDeviceDescriptor{0x0200, 0, 0, 0, 16, 0x046d, 0xc29b, 0x1350, 1, 2, 0, 1});
 
 	// parse the raw response like with passthrough device
+	// 09 02 29 00 01 01 04 80 31 09 04 00 00 02 03 00 00 00 09 21 11 01 21 01 22 85 00 07 05 81 03 10 00 02 07 05 01 03 10 00 02
 	static constexpr u8 raw_config[] = {0x9, 0x2, 0x29, 0x0, 0x1, 0x1, 0x4, 0x80, 0x31, 0x9, 0x4, 0x0, 0x0, 0x2, 0x3, 0x0, 0x0, 0x0, 0x9, 0x21, 0x11, 0x1, 0x21, 0x1, 0x22, 0x85, 0x0, 0x7, 0x5, 0x81, 0x3, 0x10, 0x0, 0x2, 0x7, 0x5, 0x1, 0x3, 0x10, 0x0, 0x2};
 	auto& conf = device.add_node(UsbDescriptorNode(raw_config[0], raw_config[1], &raw_config[2]));
 	for (unsigned int index = raw_config[0]; index < sizeof(raw_config);)
@@ -125,6 +127,17 @@ void usb_device_logitech_g27::control_transfer(u8 bmRequestType, u8 bRequest, u1
 	transfer->expected_time = get_timestamp() + 100;
 
 	// Log these for now, might not need to implement anything
+	const bool out = !(bmRequestType >> 7);
+	printf("unhandled control transfer bmRequestType %02x, bRequest %02x, wValue %04x, wIndex %04x, wLength %04x\n", bmRequestType, bRequest, wValue, wIndex, wLength);
+	if (out)
+	{
+		logitech_g27_log.todo("unhandled control transfer bmRequestType %02x, bRequest %02x, wValue %04x, wIndex %04x, wLength %04x, %s", bmRequestType, bRequest, wValue, wIndex, wLength, fmt::buf_to_hexstring(buf, buf_size));
+	}
+	else
+	{
+		logitech_g27_log.todo("unhandled control transfer bmRequestType %02x, bRequest %02x, wValue %04x, wIndex %04x, wLength %04x", bmRequestType, bRequest, wValue, wIndex, wLength);
+	}
+
 	usb_device_emulated::control_transfer(bmRequestType, bRequest, wValue, wIndex, wLength, buf_size, buf, transfer);
 }
 
